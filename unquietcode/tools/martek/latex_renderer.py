@@ -5,7 +5,6 @@ import random
 import re
 
 from mistletoe.base_renderer import BaseRenderer
-from pyfiglet import Figlet
 
 # https://github.com/miyuchina/mistletoe/blob/master/mistletoe/base_renderer.py
 
@@ -25,27 +24,40 @@ from pyfiglet import Figlet
     # 'Heading':        self.render_heading,
     
     # 'RawText':        self.render_raw_text,
-    # 'AutoLink':       self.render_auto_link,
-    # 'EscapeSequence': self.render_escape_sequence,    
-    # 'SetextHeading':  self.render_heading,
+    # 'AutoLink':       self.render_auto_link, ???
+    # 'EscapeSequence': self.render_escape_sequence,    ???
+    # 'SetextHeading':  self.render_heading,    ???
     
-    # 'Image':          self.render_image,
+    # 'Image':          self.render_image, ????
     # 'BlockCode':      self.render_block_code,
-    # 'Table':          self.render_table,
-    # 'TableRow':       self.render_table_row,
-    # 'TableCell':      self.render_table_cell,
+    # 'Table':          self.render_table, ????
+    # 'TableRow':       self.render_table_row, ????????
+    # 'TableCell':      self.render_table_cell, ??????????
+
+# class BracketedSpan(SpanToken):
+    # pattern = re.compile(r'\[(.*?)\]\{(.*?)\}')
+    # parse_inner = False
+    # parse_group = 0
+#   def __init__(self, match):
+#       self.text = EscapeSequence.strip(match.group(1).strip())
+#       self.meta = EscapeSequence.strip(match.group(2))
 
 
-class CharacterSequence:
-    ESC = '\u001B['
-    OSC = '\u001B]'
-    BEL = '\u0007'
-    SEP = ';'
 
-# alias for brevity
-C = CharacterSequence
+PREAMBLE = """
+\\documentclass{article}
+\\usepackage{mdframed}
+\\usepackage{hyperref}
+\\usepackage{ulem}
+\\usepackage{xcolor}
+\\usepackage{listings}
+\\usepackage{etoolbox}
+\n\\begin{document}""" #\\AtBeginEnvironment{quote}{\\singlespacing\\small}
+#\\newcommand*{\\code_font}{\\fontfamily{otf}\\selectfont}
 
-TRAILING_WHITESPACE = re.compile("^.*?(\s+)$")
+POSTAMBLE = "\\end{document}"
+
+TRAILING_WHITESPACE = ""
 
 
 def prefixed(prefix):
@@ -75,78 +87,33 @@ def sufixed(suffix):
     
     return outer
 
-    
-
-# TODO wrapping by width of terminal
-
 def underlined(text):
-    return f"\x1B[4m{text}\x1B[0m"
+    return f"\\underline{{{text}}}"
     
 def bold(text):
-    return f"\x1B[1m{text}\x1B[0m"
+    return f"\\textbf{{{text}}}"
     
 def italics(text):
-     return f"\x1B[3m{text}\x1B[0m"
-
-def dim(text):
-    return f"\x1b[2m{text}\x1B[0m"
+     return f"\\textit{{{text}}}"
 
 def strikethrough(text):
-    return f"\x1B[9m{text}\x1B[0m"
+    return f"\\sout{{{text}}}"
 
-def grey(text):
-    return f"  \x1B[37m{text}\x1B[0m"
+def _(input):
+  return textwrap.dedent(input).strip()
 
 
-class TerminalRenderer(BaseRenderer):
+class LatexRenderer(BaseRenderer):
 
     def __init__(self):
         super().__init__()
         
         self.render_map['BlockCode'] = self.render_banner
     
-    
-    def _get_terminal_size(self): # columns, rows tuple
-        return shutil.get_terminal_size()
-    
-    @property
-    def _terminal_rows(self):
-        return self._get_terminal_size()[1]
-
-    @property
-    def _terminal_cols(self):
-        return self._get_terminal_size()[0]
-    
-    @property
-    def _spacer(self):
-        return "  "
-        
-    @property
-    def _margin(self):
-        return math.floor(self._terminal_cols * 0.75)        
-
-
-    def figlet(self, font, text, space=1, transform=None):
-        if transform is not None:
-            text = transform(text) 
-        
-        figlet = Figlet(font=font, width=self._margin)
-        lines = figlet.renderText(text).splitlines()
-        
-        rendered = ""
-        space = ' ' * space
-        
-        for line in lines:
-            rendered += f"{space}{line}\n"
-
-        return rendered[0:-1]
-    
-    
-    # generic styles
-    
     def render_document(self, token):
-        rendered = "\n"
+        rendered = PREAMBLE
         rendered += self.render_inner(token)
+        rendered += POSTAMBLE
         return rendered
 
 
@@ -158,9 +125,9 @@ class TerminalRenderer(BaseRenderer):
             return token.content
     
 
-    # def render_raw_text(self, token):
-    #     print(f"it's {token.content}")
-    #     return self.render_to_plain(token)
+    def render_raw_text(self, token):
+        #print(f"it's {token.content}")
+        return self.render_to_plain(token)
         
         
     # inline styles
@@ -185,66 +152,50 @@ class TerminalRenderer(BaseRenderer):
         # 
         # return rendered
     
-    
     def render_inline_code(self, token):
-        return f"\x1B[7m{self.render_inner(token)}\x1B[0m"
+        return f"\\lstinline{{{self.render_inner(token)}}} "
+    
+    def render_block_code(self, token):
+        return _(f"""\\begin{{lstlisting}}
+                    {{\code_font {self.render_inner(token)} }}
+                    \\end{{lstlisting}}""")
 
 
     def render_line_break(self, token):
-        return '\n'# * len(token.content)
-
+        return '\\\\\n'
 
     def render_link(self, token):
-        return ''.join([
-            C.OSC,'8',C.SEP,C.SEP,
-            token.target,
-            C.BEL,
-            self.render_inner(token),
-            C.OSC,'8',C.SEP,C.SEP,C.BEL,
-        ])
-        
-        # return f"{self.render_inner(token)} ({underlined(token.target)})"
+      return f"\\href{{{token.target}}}{{{underlined(self.render_inner(token))}}}"
 
     # @prefixed('\n')
-    @sufixed('\n')
+    @sufixed('\n') 
     def render_heading(self, token):
         space = 2
         text = self.render_to_plain(token)
         
         if token.level == 1:
-            return self.figlet('standard', text.replace(' ', '  '), space=space)
+            return f"\\part*{{{text}}}\n" #self.figlet('standard', text.replace(' ', '  '), space=space)
 
-        elif token.level == 2:
-            rendered = self.figlet('ogre', text, space=space)
-            
-            # make the last line underlined
-            lines = rendered.split('\n')
-            last_line = lines[-1]
-            longest_line = max([len(line) for line in lines])
-            
-            line_to_underline = last_line[len(self._spacer):]
-            line_to_underline += ' ' * (longest_line - len(line_to_underline))
-            
-            last_line = self._spacer + underlined(line_to_underline)
-            lines[-1] = last_line
-            rendered = '\n'.join(lines)
-            
-            return f"{rendered}\n"
+        elif token.level == 2: 
+            return f"\\section*{{{underlined(text)}}}\n"
         
         elif token.level == 3:
-            return self.figlet('cybermedium', text, space=space)
+            return f"\\subsection*{{{text}}}\n" #self.figlet('cybermedium', text, space=space)
             
         elif token.level == 4:
-            return f"{self._spacer}{underlined(bold(self.render_inner(token).upper()))}"
+            return f"\\subsubsection*{{{(bold(self.render_inner(token).upper()))}}}\n"
 
         elif token.level == 5:
-            return f"{self._spacer}{dim(underlined(bold(self.render_inner(token).upper())))}"
+            return _(f"""
+              \\paragraph*{{{(bold(self.render_inner(token).upper()))}}}
+              \\vspace{{\\baselineskip}}
+            """)
                     
         elif token.level >= 6:
-            return f"{self._spacer}{dim(underlined(self.render_inner(token).upper()))}"
+            return f"\\subparagraph*{{{(self.render_inner(token).upper())}}}\n\\vspace{{\\baselineskip}}"
         
         else:
-            return f"{self._spacer}{underlined(self.render_inner(token))}"
+            return f"{underlined(self.render_inner(token))}\n"
         
     
     # def render_banner(self, token):
@@ -275,7 +226,7 @@ class TerminalRenderer(BaseRenderer):
     
     def render_banner(self, token):
         text = self.render_inner(token)
-        text = self.figlet('com_sen_', self.invert_case(text), space=2)
+        #text = self.figlet('com_sen_', self.invert_case(text), space=2)
         
         lines = text.splitlines()
         line = "=" * (max(len(lines[0]), len(lines[-1])) -1)
@@ -288,103 +239,56 @@ class TerminalRenderer(BaseRenderer):
     #         return "QQ"
     #     else:
     #         return super().render_escape_sequence(self, token)
-        
-    
+    @prefixed('\n')    
+    @sufixed('\n')
     def render_thematic_break(self, token):
-        width = math.floor(self._terminal_cols * 0.45)
-        
-        rendered = f"{self._spacer}◈"
-        rendered += "─" * width
-        rendered += "◈\n\n"
-        return rendered
-        
+        return '\\hrulefill\n'
     
     def render_paragraph(self, token):
         text = self.render_inner(token)
-        rendered = ""
-
-        lines = textwrap.wrap(text, width=self._margin, replace_whitespace=False, drop_whitespace=False)
-        
-        for line in lines:
-            for line in line.split("\n"):
-                add_newline = False
-
-                if line.endswith('\\'):
-                    line = line[:-1]
-                    add_newline = True
-                # elif not line.strip():
-                #     add_newline = True
-
-                rendered += f"{self._spacer}{line.strip()}\n"
-                # rendered += '\n' if add_newline is True else ''
-                # rendered += "\n"
-                if not line.strip() and add_newline is True:
-                    rendered += "\n"
-        
-        # if rendered.strip():
-            # rendered += "\n"
-        
-        return rendered
-        
+        return f'{text}'        
 
     def render_quote(self, token):
-        innards = self.render_inner(token)
-        rendered = ''
-
-        for line in innards.splitlines():
-            if line.strip():
-                inner = grey(f"|  {line.strip()}")
-                rendered += f"{self._spacer}{inner}\n"
-            else:
-                rendered += line
-
-        rendered += "\n"
-        return rendered
-    
+        return f"\n\\begin{{quote}}\n{self.render_inner(token)}\n\\end{{quote}}\n"
     
     def render_list(self, token):
-        rendered = ""
-        counter = None
+      #print(dir(token))
+      rendered = ''
+      for child in token.children:
+          rendered += '\\item '
+          rendered += self.render_inner(child)
+          rendered += '\n'
+
+      if (token.start):
+        rendered = f"\\begin{{enumerate}}\n{rendered}\\end{{enumerate}}"
+      else:
+        rendered = f"\\begin{{itemize}}\n{rendered}\\end{{itemize}}"
         
-        if token.start is not None:
-            counter = token.start
-        
-        for child in token.children:
-            if counter is not None:
-                rendered += f"{self._spacer}{counter}. "
-                counter += 1
-            else:
-                prefix = ' ' * ((child.prepend - 2) * 2)
-                rendered += f"{self._spacer}{prefix}{child.leader} "
-            
-            rendered += self.render(child)
-        
-        rendered += "\n"
-        return rendered
-    
+      return rendered    
     
     def render_list_item(self, token):
         rendered = ""
         line = self.render_inner(token)
         
         if line.strip():
-            rendered += f"{line.strip()}\n"
+            rendered += f"\item {line.strip()} \n"
         
         return rendered
         
     
     def render_block_code(self, token):
         innards = self.render_inner(token)
-        rendered = ''
-
-        for line in innards.split('\n'):
-            if line.strip():
-                wrapped_lines = textwrap.wrap(line.strip(), width=self._margin)
-                
-                for wrapped_line in wrapped_lines:
-                    rendered += f"  \x1B[37m|  {wrapped_line}\x1B[0m\n"
-            else:
-                rendered += f"  \x1B[37m|  {line}\x1B[0m\n"
-
-        rendered += "\n"
+        rendered = f"\n\\begin{{mdframed}}[backgroundcolor=gray!10]\n\\begin{{lstlisting}}\n{innards}\n\\end{{lstlisting}}\n\\end{{mdframed}}\n"
+        # {innards}
+        # \end{{lstlisting}}
+        # }}
+        # \\end{{mdframed}}\n""")
+        # rendered = _(f"""
+        # \\begin{{mdframed}}[backgroundcolor=gray!10]
+        # {{\\fontfamily{{\sfmonospace}}\\selectfont 
+        # \\begin{{lstlisting}}
+        # {innards}
+        # \end{{lstlisting}}
+        # }}
+        # \\end{{mdframed}}\n""")
         return rendered
