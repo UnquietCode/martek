@@ -34,15 +34,15 @@ from mistletoe.base_renderer import BaseRenderer
     # 'TableRow':       self.render_table_row, ????????
     # 'TableCell':      self.render_table_cell, ??????????
 
-# class BracketedSpan(SpanToken):
-    # pattern = re.compile(r'\[(.*?)\]\{(.*?)\}')
-    # parse_inner = False
-    # parse_group = 0
+# class bracketed_span(SpanToken):
+#   pattern = re.compile(r'\[(.*?)\]\{(.*?)\}')
+#   parse_inner = False
+#   parse_group = 0
 #   def __init__(self, match):
 #       self.text = EscapeSequence.strip(match.group(1).strip())
 #       self.meta = EscapeSequence.strip(match.group(2))
 
-
+# PREAMBLE = ""
 
 PREAMBLE = """
 \\documentclass{article}
@@ -52,13 +52,39 @@ PREAMBLE = """
 \\usepackage{xcolor}
 \\usepackage{listings}
 \\usepackage{etoolbox}
-\n\\begin{document}""" #\\AtBeginEnvironment{quote}{\\singlespacing\\small}
-#\\newcommand*{\\code_font}{\\fontfamily{otf}\\selectfont}
+\\usepackage{fancyvrb}
+\\usepackage{enumitem,amssymb}
+\\usepackage{cprotect}
+\\usepackage{pifont}
+\\newcommand{\\cmark}{\\ding{51}}%
+\\newcommand{\\xmark}{\\ding{55}}%
+\\newcommand{\\done}{\\rlap{$\\square$}{\\raisebox{2pt}{\\large\\hspace{1pt}\\cmark}}%
+\\hspace{-2.5pt}}
+\\setlength{\\parindent}{0pt}
+\n\\begin{document}
+\\newcommand*{\\headerType}{\\subsection}
+\\newcommand*{\\codeFont}{\\fontfamily{otf}\\selectfont}
+\\newcommand*{\\hAFont}{\\Huge{\\fontfamily{otf}\\selectfont}}
+\\newcommand*{\\hBFont}{\\huge{\\fontfamily{otf}\\selectfont}}
+\\newcommand*{\\hCFont}{\\LARGE{\\fontfamily{otf}\\selectfont}}
+\\newcommand*{\\hDFont}{\\Large{\\fontfamily{otf}\\selectfont}}
+\\newcommand*{\\hEFont}{\\large{\\fontfamily{otf}\\selectfont}}
+\\newcommand*{\\hFFont}{\\centerline{\\normalsize{\\fontfamily{otf}\\selectfont}}}
+""" 
+
+#\\newcommand{\\wontfix}{\\rlap{$\\square$}{\\large\\hspace{1pt}\\xmark}}\\square$}{\\raisebox{2pt}{\\large\\hspace{1pt}\\cmark}}%
+
+#
+#""" #\\AtBeginEnvironment{quote}{\\singlespacing\\small}
 
 POSTAMBLE = "\\end{document}"
 
 TRAILING_WHITESPACE = ""
 
+BLANK_LINE = " \n \\vspace{\\baselineskip} \n " #this isn't an f string so we only need single {}
+
+UNCHECKED_BOX = "$\square$"
+CHECKED_BOX = '\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}'
 
 def prefixed(prefix):
     
@@ -100,6 +126,8 @@ def strikethrough(text):
     return f"\\sout{{{text}}}"
 
 def _(input):
+  # input = '\n'.join([_.lstrip() for _ in input.splitlines()])
+  # return input.strip()
   return textwrap.dedent(input).strip()
 
 
@@ -107,7 +135,9 @@ class LatexRenderer(BaseRenderer):
 
     def __init__(self):
         super().__init__()
-        
+        #tokens = self._tokens_from_module(latex_token)
+        self.packages = {}
+        #super().__init__(*chain(tokens, extras))
         self.render_map['BlockCode'] = self.render_banner
     
     def render_document(self, token):
@@ -127,8 +157,17 @@ class LatexRenderer(BaseRenderer):
 
     def render_raw_text(self, token):
         #print(f"it's {token.content}")
-        return self.render_to_plain(token)
+        rtn = self.render_to_plain(token)
+        rtn = re.sub(r'(\\)',r'\\textbackslash ', rtn)
+        rtn = re.sub(r'([\&\%\$\#\_\{\}~\^])',r'\\\1', rtn)
         
+        # rtn = re.sub('–','--', rtn)
+        # rtn = re.sub('—','---', rtn)
+        return rtn
+
+        #return '\\begin{verbatim}\n' + self.render_to_plain(token) + '\n\\end{verbatim}\n'     
+        #return '\\verb!' + self.render_to_plain(token) + '!\n'         #https://www.overleaf.com/learn/latex/Errors/LaTeX_Error:_%5Cverb_ended_by_end_of_line
+   
         
     # inline styles
     
@@ -153,16 +192,16 @@ class LatexRenderer(BaseRenderer):
         # return rendered
     
     def render_inline_code(self, token):
-        return f"\\lstinline{{{self.render_inner(token)}}} "
+        return f"\colorbox{{lightgray}}{{ \\codeFont \\texttt{{{self.render_inner(token)}}} }} " + BLANK_LINE
     
     def render_block_code(self, token):
         return _(f"""\\begin{{lstlisting}}
-                    {{\code_font {self.render_inner(token)} }}
+                    {{\codeFont {self.render_inner(token)} }}
                     \\end{{lstlisting}}""")
 
 
     def render_line_break(self, token):
-        return '\\\\\n'
+        return '\n' if token.soft else '\\newline\n'
 
     def render_link(self, token):
       return f"\\href{{{token.target}}}{{{underlined(self.render_inner(token))}}}"
@@ -171,31 +210,32 @@ class LatexRenderer(BaseRenderer):
     @sufixed('\n') 
     def render_heading(self, token):
         space = 2
-        text = self.render_to_plain(token)
+        text = self.render_inner(token)
         
         if token.level == 1:
-            return f"\\part*{{{text}}}\n" #self.figlet('standard', text.replace(' ', '  '), space=space)
+            return f"\\vspace{{\\baselineskip}}{{\\hAFont \\section*{{{text}}}}}\n" #self.figlet('standard', text.replace(' ', '  '), space=space)
 
         elif token.level == 2: 
-            return f"\\section*{{{underlined(text)}}}\n"
+            return f"\\vspace{{\\baselineskip}}{{\\hBFont \\subsection*{{{underlined(text)}}}}}\n"
         
         elif token.level == 3:
-            return f"\\subsection*{{{text}}}\n" #self.figlet('cybermedium', text, space=space)
+            return f"\\vspace{{\\baselineskip}}{{\\hCFont \\subsubsection*{{{text}}}}}\n" #self.figlet('cybermedium', text, space=space)
             
         elif token.level == 4:
-            return f"\\subsubsection*{{{(bold(self.render_inner(token).upper()))}}}\n"
+            return f"\\vspace{{\\baselineskip}}{{\\hDFont \\subsubsection*{{{(bold(self.render_inner(token).upper()))}}}}}\n"
 
         elif token.level == 5:
             return _(f"""
-              \\paragraph*{{{(bold(self.render_inner(token).upper()))}}}
               \\vspace{{\\baselineskip}}
+              {{\\hBFont  
+              \\subsubsection*{{{(bold(self.render_inner(token).upper()))}}}}}
             """)
                     
         elif token.level >= 6:
-            return f"\\subparagraph*{{{(self.render_inner(token).upper())}}}\n\\vspace{{\\baselineskip}}"
+            return f"\\color{{gray}}\n\\vspace{{\\baselineskip}}{{\\hBFont \\subsubsection*{{{(self.render_inner(token).upper())}}}}}\n\\color{{black}}\n"
         
         else:
-            return f"{underlined(self.render_inner(token))}\n"
+            return f"\\vspace{{\\baselineskip}}{underlined(self.render_inner(token))}\n"
         
     
     # def render_banner(self, token):
@@ -246,39 +286,61 @@ class LatexRenderer(BaseRenderer):
     
     def render_paragraph(self, token):
         text = self.render_inner(token)
-        return f'{text}'        
+        #print('\n\n\n Here is the text-----------------: \n', text, '\n---------------\n\n\n')
+        #\\vspace{{\\baselineskip}} 
+        return f'{text}\n\\vspace{{\\baselineskip}}\n'        
 
     def render_quote(self, token):
         return f"\n\\begin{{quote}}\n{self.render_inner(token)}\n\\end{{quote}}\n"
     
     def render_list(self, token):
-      #print(dir(token))
-      rendered = ''
-      for child in token.children:
-          rendered += '\\item '
-          rendered += self.render_inner(child)
-          rendered += '\n'
+      self.packages['listings'] = []
+      template = '\\begin{{{tag}}}\n{inner}\\end{{{tag}}}\n'
+      tag = 'enumerate' if token.start is not None else 'itemize'
+      inner = '\n'.join([self.render(child) for child in token.children])
+      return template.format(tag=tag, inner=inner)
 
-      if (token.start):
-        rendered = f"\\begin{{enumerate}}\n{rendered}\\end{{enumerate}}"
-      else:
-        rendered = f"\\begin{{itemize}}\n{rendered}\\end{{itemize}}"
+      #print(dir(token))
+      
+      # inner = ''
+      # for child in token.children:
+      #     inner += '\\item '
+      #     inner += self.render_inner(child)
+      #     inner += '\n'
+      # return template.format(tag=tag, inner=inner)
+
+      # if (token.start):
+      #   rendered = f"\\begin{{enumerate}}\n{rendered}\\end{{enumerate}}"
+      # else:
+      #   rendered = f"\\begin{{itemize}}\n{rendered}\\end{{itemize}}"
         
-      return rendered    
+      # return rendered    
     
     def render_list_item(self, token):
         rendered = ""
         line = self.render_inner(token)
         
-        if line.strip():
-            rendered += f"\item {line.strip()} \n"
-        
+        line = line.strip()
+        if line:
+          print(line[:3])
+          if line[:3] == '[x]':
+            line = CHECKED_BOX + line[3:]
+          elif line[:3] == '[ ]':
+            line = UNCHECKED_BOX + line[3:]
+          rendered += f"\\item {line} \n"
+
         return rendered
         
     
     def render_block_code(self, token):
         innards = self.render_inner(token)
-        rendered = f"\n\\begin{{mdframed}}[backgroundcolor=gray!10]\n\\begin{{lstlisting}}\n{innards}\n\\end{{lstlisting}}\n\\end{{mdframed}}\n"
+        rendered = \
+          "\\begin{mdframed}[backgroundcolor=gray!10]\n" \
+          "\\begin{lstlisting}\n" \
+          f"{innards}\n" \
+          "\\end{lstlisting}\n" \
+          "\\end{mdframed}" \
+        
         # {innards}
         # \end{{lstlisting}}
         # }}
@@ -292,3 +354,57 @@ class LatexRenderer(BaseRenderer):
         # }}
         # \\end{{mdframed}}\n""")
         return rendered
+
+    def render_table(self, token):
+        def render_align(column_align):
+            if column_align != [None]:
+                cols = [get_align(col) for col in token.column_align]
+                return '{{{}}}'.format(' '.join(cols))
+            else:
+                return ''
+
+        def get_align(col):
+            if col is None:
+                return 'l'
+            elif col == 0:
+                return 'c'
+            elif col == 1:
+                return 'r'
+            raise RuntimeError('Unrecognized align option: ' + col)
+
+        template = ('\\begin{{tabular}}{align}\n'
+                    '{inner}'
+                    '\\end{{tabular}}\n')
+        if hasattr(token, 'header'):
+            head_template = '{inner}\\hline\n'
+            head_inner = self.render_table_row(token.header)
+            head_rendered = head_template.format(inner=head_inner)
+        else: head_rendered = ''
+        inner = self.render_inner(token)
+        align = render_align(token.column_align)
+        return template.format(inner=head_rendered+inner, align=align)
+
+    def render_table_row(self, token):
+        cells = [self.render(child) for child in token.children]
+        return ' & '.join(cells) + ' \\\\\n'
+
+    def render_table_cell(self, token):
+        return self.render_inner(token)
+
+    def render_packages(self):
+        pattern = '\\usepackage{options}{{{package}}}\n'
+        return ''.join(pattern.format(options=options or '', package=package)
+                         for package, options in self.packages.items())
+
+    # def render_document(self, token):
+    #     template = ('\\documentclass{{article}}\n'
+    #                 '{packages}'
+    #                 '\\begin{{document}}\n'
+    #                 '{inner}'
+    #                 '\\end{{document}}\n')
+    #     self.footnotes.update(token.footnotes)
+    #     return template.format(inner=self.render_inner(token),
+    #                            packages=self.render_packages())
+
+    # def render_bracketed_span(self, token):
+    #   return token.text
