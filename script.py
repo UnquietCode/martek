@@ -122,7 +122,13 @@ def main(repo):
             # with open(md_filename, 'w') as f:
             md_content += "# # – {0} {1} \n\n".format(number, title)
             md_content += "### Reported by {0} \n\n".format(issue['user']['login'])
-            md_content += ' **Milestone**: {0} \n\n'.format(issue['milestone']['title'])
+
+            # handle milestone, if present
+            milestone = issue['milestone']
+            
+            if milestone is not None:
+                md_content += f"**Milestone**: {milestone['title']} \n\n"
+            
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
