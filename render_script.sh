@@ -1,2 +1,2 @@
-python3 test.py test.md
+python3 test.py test2.md
 pdflatex test.tex

@@ -62,8 +62,7 @@ PREAMBLE = """
 \\hspace{-2.5pt}}
 \\setlength{\\parindent}{0pt}
 \n\\begin{document}
-\\newcommand*{\\headerType}{\\subsection}
-\\newcommand*{\\codeFont}{\\fontfamily{otf}\\selectfont}
+\\definecolor{code-background}{gray}{.95}
 \\newcommand*{\\hAFont}{\\Huge{\\fontfamily{otf}\\selectfont}}
 \\newcommand*{\\hBFont}{\\huge{\\fontfamily{otf}\\selectfont}}
 \\newcommand*{\\hCFont}{\\LARGE{\\fontfamily{otf}\\selectfont}}
@@ -192,11 +191,11 @@ class LatexRenderer(BaseRenderer):
         # return rendered
     
     def render_inline_code(self, token):
-        return f"\colorbox{{lightgray}}{{ \\codeFont \\texttt{{{self.render_inner(token)}}} }} " + BLANK_LINE
+        return f"\colorbox{{code-background}}{{\\texttt{{{self.render_inner(token)}}}}}" + BLANK_LINE
     
     def render_block_code(self, token):
         return _(f"""\\begin{{lstlisting}}
-                    {{\codeFont {self.render_inner(token)} }}
+                    {{\\texttt {self.render_inner(token)} }}
                     \\end{{lstlisting}}""")
 
 
@@ -213,29 +212,29 @@ class LatexRenderer(BaseRenderer):
         text = self.render_inner(token)
         
         if token.level == 1:
-            return f"\\vspace{{\\baselineskip}}{{\\hAFont \\section*{{{text}}}}}\n" #self.figlet('standard', text.replace(' ', '  '), space=space)
+            return f"\n{{\\hAFont \\section*{{{text}}}}}\n"#\\vspace{{\\baselineskip}}\n" #self.figlet('standard', text.replace(' ', '  '), space=space)
 
         elif token.level == 2: 
-            return f"\\vspace{{\\baselineskip}}{{\\hBFont \\subsection*{{{underlined(text)}}}}}\n"
+            return f"\n{{\\hBFont \\subsection*{{{underlined(text)}}}}}\n"#\\vspace{{\\baselineskip}}\n"
         
-        elif token.level == 3:
-            return f"\\vspace{{\\baselineskip}}{{\\hCFont \\subsubsection*{{{text}}}}}\n" #self.figlet('cybermedium', text, space=space)
+        elif token.level >= 3:
+            return f"\n{{\\hCFont \\subsubsection*{{{text}}}}}\n" #\\vspace{{\\baselineskip}}\n" #self.figlet('cybermedium', text, space=space)
             
-        elif token.level == 4:
-            return f"\\vspace{{\\baselineskip}}{{\\hDFont \\subsubsection*{{{(bold(self.render_inner(token).upper()))}}}}}\n"
+        # elif token.level == 4:
+        #     return f"\n{{\\hDFont {(bold(self.render_inner(token).upper()))}}}\n\\vspace{{\\baselineskip}}\n"
 
-        elif token.level == 5:
-            return _(f"""
-              \\vspace{{\\baselineskip}}
-              {{\\hBFont  
-              \\subsubsection*{{{(bold(self.render_inner(token).upper()))}}}}}
-            """)
+        # elif token.level == 5:
+        #     return _(f"""
+        #       {{\\hBFont  
+        #       {(bold(self.render_inner(token).upper()))}}}
+        #       \\vspace{{\\baselineskip}}
+        #     """)
                     
-        elif token.level >= 6:
-            return f"\\color{{gray}}\n\\vspace{{\\baselineskip}}{{\\hBFont \\subsubsection*{{{(self.render_inner(token).upper())}}}}}\n\\color{{black}}\n"
-        
+        # elif token.level >= 6:
+        #     return f"{{\\color{{gray}}\n{{\\hBFont {(self.render_inner(token).upper())}}}\n}}\n\\vspace{{\\baselineskip}}\n"
+    
         else:
-            return f"\\vspace{{\\baselineskip}}{underlined(self.render_inner(token))}\n"
+            return f"\n{underlined(self.render_inner(token))}\n\\vspace{{\\baselineskip}}\n"
         
     
     # def render_banner(self, token):
@@ -279,10 +278,10 @@ class LatexRenderer(BaseRenderer):
     #         return "QQ"
     #     else:
     #         return super().render_escape_sequence(self, token)
-    @prefixed('\n')    
-    @sufixed('\n')
+    # @prefixed('\n')    
+    # @sufixed('\n')
     def render_thematic_break(self, token):
-        return '\\hrulefill\n'
+        return '\n\\hrulefill\n'
     
     def render_paragraph(self, token):
         text = self.render_inner(token)
