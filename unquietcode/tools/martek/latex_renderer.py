@@ -53,9 +53,15 @@ PREAMBLE = """
 \\usepackage{listings}
 \\usepackage{etoolbox}
 \\usepackage{fancyvrb}
+\\usepackage[utf8]{inputenc}
+\\usepackage[T1]{fontenc}
+\\usepackage{textcomp}
+\\usepackage{lmodern}
 \\usepackage{enumitem,amssymb}
 \\usepackage{cprotect}
 \\usepackage{pifont}
+\\usepackage{graphicx}
+\\graphicspath{ {./images/} }
 \\newcommand{\\cmark}{\\ding{51}}%
 \\newcommand{\\xmark}{\\ding{55}}%
 \\newcommand{\\done}{\\rlap{$\\square$}{\\raisebox{2pt}{\\large\\hspace{1pt}\\cmark}}%
@@ -80,7 +86,10 @@ POSTAMBLE = "\\end{document}"
 
 TRAILING_WHITESPACE = ""
 
-BLANK_LINE = " \n \\vspace{\\baselineskip} \n " #this isn't an f string so we only need single {}
+#BLANK_LINE = " \n \\vspace{\\baselineskip} \n " #this isn't an f string so we only need single {}
+NEW_LINE = "\\mbox\\\\\n"
+INDENT = "\\indent\n" 
+BLANK_LINE = NEW_LINE + NEW_LINE + INDENT #this feels hacky and stupid but I can't find a better way to skip a line without Latex filling the previous line with later text
 
 UNCHECKED_BOX = "$\square$"
 CHECKED_BOX = '\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}'
@@ -159,6 +168,7 @@ class LatexRenderer(BaseRenderer):
         rtn = self.render_to_plain(token)
         rtn = re.sub(r'(\\)',r'\\textbackslash ', rtn)
         rtn = re.sub(r'([\&\%\$\#\_\{\}~\^])',r'\\\1', rtn)
+        rtn += BLANK_LINE + INDENT
         
         # rtn = re.sub('–','--', rtn)
         # rtn = re.sub('—','---', rtn)
@@ -218,7 +228,7 @@ class LatexRenderer(BaseRenderer):
             return f"\n{{\\hBFont \\subsection*{{{underlined(text)}}}}}\n"#\\vspace{{\\baselineskip}}\n"
         
         elif token.level >= 3:
-            return f"\n{{\\hCFont \\subsubsection*{{{text}}}}}\n" #\\vspace{{\\baselineskip}}\n" #self.figlet('cybermedium', text, space=space)
+            return f"\n{{\\hCFont \\subsubsection*{{{text}}}}}\n" + BLANK_LINE #\\vspace{{\\baselineskip}}\n" #self.figlet('cybermedium', text, space=space)
             
         # elif token.level == 4:
         #     return f"\n{{\\hDFont {(bold(self.render_inner(token).upper()))}}}\n\\vspace{{\\baselineskip}}\n"
@@ -234,7 +244,7 @@ class LatexRenderer(BaseRenderer):
         #     return f"{{\\color{{gray}}\n{{\\hBFont {(self.render_inner(token).upper())}}}\n}}\n\\vspace{{\\baselineskip}}\n"
     
         else:
-            return f"\n{underlined(self.render_inner(token))}\n\\vspace{{\\baselineskip}}\n"
+            return f"\n{underlined(self.render_inner(token))}\n" + BLANK_LINE
         
     
     # def render_banner(self, token):
@@ -287,7 +297,7 @@ class LatexRenderer(BaseRenderer):
         text = self.render_inner(token)
         #print('\n\n\n Here is the text-----------------: \n', text, '\n---------------\n\n\n')
         #\\vspace{{\\baselineskip}} 
-        return f'{text}\n\\vspace{{\\baselineskip}}\n'        
+        return f'{text}\\\\\n'  #\\vspace{{\\baselineskip}}\n'        
 
     def render_quote(self, token):
         return f"\n\\begin{{quote}}\n{self.render_inner(token)}\n\\end{{quote}}\n"
@@ -407,3 +417,8 @@ class LatexRenderer(BaseRenderer):
 
     # def render_bracketed_span(self, token):
     #   return token.text
+
+    def render_image(self, token):
+      self.packages['graphicx'] = []
+      return '\n\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{}}}\n'.format(token.src)
+

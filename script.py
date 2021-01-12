@@ -120,9 +120,10 @@ def main(repo):
             md_content = ""
 
             # with open(md_filename, 'w') as f:
-            md_content += "# #{0}-{1} \n\n".format(number, title)
+            md_content += "# #{0} - {1} \n\n".format(number, title)
             md_content += "### Reported by @{0} \n\n".format(issue['user']['login'])
-            md_content += ' **Milestone**: {0} \n\n'.format(issue['milestone']['title'])
+            if issue['milestone']:
+              md_content += ' **Milestone**: {0} \n\n'.format(issue['milestone']['title'])
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
@@ -147,7 +148,7 @@ def main(repo):
             file.write(md_content) 
             file.close() 
 
-            tex_file_path = "./images/issue_{}.tex".format(number)
+            tex_file_path = "./tex/issue_{}.tex".format(number)
 
             # subprocess.check_call(['python3', 'test.py', md_file_path])
             # subprocess.check_call(['pdflatex', tex_file_path])
