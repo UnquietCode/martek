@@ -125,6 +125,7 @@ def main(repo):
             md_content += "### Reported by @{0} \n\n".format(issue['user']['login'])
             if issue['milestone']:
               md_content += ' **Milestone**: {0} \n\n'.format(issue['milestone']['title'])
+           
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
