@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import sys
 import mistletoe
+from datetime import datetime
 from mistletoe.ast_renderer import ASTRenderer
 from unquietcode.tools.martek import LatexRenderer 
 from mistletoe.latex_renderer import LaTeXRenderer
@@ -134,13 +135,20 @@ def main(repo):
                 comments_request = requests.get(issue['comments_url'],
                                                 headers=standard_headers)
                 for comment in comments_request.json():
-                    md_content += ("\n### Comment from {0} \n".format(comment['user']['login']))
+                    print(json.dumps(comment, indent=2)) 
+                    USER = comment['user']['login']
+                    RAW_DATETIME = comment['created_at']
+                    DATETIME_OBJ = datetime.strptime(RAW_DATETIME, '%Y-%m-%dT%H:%M:%SZ')
+                    DATE = DATETIME_OBJ.date() #2021-01-09T20:41:02Z
+                    DATE_WORDS = DATE.strftime('%A %d %B %Y')
+                    md_content += ("\n### @{0} wrote on {1}".format(USER, DATE_WORDS))
+                    md_content += '\n\n'
                     comment_body = comment['body']
                     comment_body = re.sub(r'^(#+)', r'###\1', comment_body)
                     comment_body = replace_images(comment_body)
                     md_content += (comment_body)
                     md_content += ("\n\n")
-                    md_content += ('new content')
+                    #md_content += ('new content')
 
           # render to .tex file
             md_file_path = "./pdfs/issue_{}.md".format(number)
