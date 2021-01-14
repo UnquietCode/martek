@@ -77,7 +77,9 @@ PREAMBLE = """
 
 POSTAMBLE = "\\end{document}"
 
+NEW_LINE = "\\mbox\\\\\n"
 INDENT = "\\indent\n"
+BLANK_LINE = NEW_LINE + NEW_LINE
 
 UNCHECKED_BOX = "$\square$"
 CHECKED_BOX = '\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}'
