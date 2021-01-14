@@ -77,9 +77,7 @@ PREAMBLE = """
 
 POSTAMBLE = "\\end{document}"
 
-NEW_LINE = "\\mbox\\\\\n"
 INDENT = "\\indent\n"
-BLANK_LINE = NEW_LINE + NEW_LINE
 
 UNCHECKED_BOX = "$\square$"
 CHECKED_BOX = '\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}'
@@ -206,7 +204,7 @@ class LatexRenderer(BaseRenderer):
     
     def render_paragraph(self, token):
         text = self.render_inner(token)
-        return f'{text}\\\\\n'
+        return f'{text}\\\\\n\n' #do we want this after?
 
 
     def render_quote(self, token):
