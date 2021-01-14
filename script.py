@@ -1,22 +1,17 @@
-#!/usr/bin/env python
-
-import errno
 import hashlib
 import json
-from optparse import OptionParser
 import os
-from os.path import dirname, exists, isdir, join, realpath, relpath, splitext
 import re
-import requests
 import subprocess
-import tempfile
-import sys
-import mistletoe
 from datetime import datetime
-from mistletoe.ast_renderer import ASTRenderer
-from unquietcode.tools.martek import LatexRenderer 
-from mistletoe.latex_renderer import LaTeXRenderer
+from optparse import OptionParser
+from os.path import dirname, exists, join, realpath, relpath, splitext
 
+import mistletoe
+import requests
+from mistletoe.ast_renderer import ASTRenderer
+
+from unquietcode.tools.martek import LatexRenderer
 
 # This is a script that downloads all the GitHub issues in a
 # particular repository and generates a PDF for each one; the idea is
@@ -31,20 +26,19 @@ standard_headers = {'User-Agent': 'github-issues-printer/1.0',
 
 cwd = os.getcwd()
 repo_directory = realpath(join(dirname(__file__)))
-images_directory = relpath(join(repo_directory, 'images'), cwd)
+tex_directory = relpath(join(repo_directory, 'tex'), cwd)
+images_directory = relpath(join(tex_directory, 'images'), cwd)
 pdfs_directory = relpath(join(repo_directory, 'pdfs'), cwd)
 
-def mkdir_p(d):
+def mkdir(d):
     try:
-        os.makedirs(d)
-    except OSError as e:
-        if e.errno == errno.EEXIST and isdir(d):
-            pass
-        else:
-            raise
+        os.mkdir(d)
+    except FileExistsError:
+        pass
 
-mkdir_p(images_directory)
-mkdir_p(pdfs_directory)
+mkdir(tex_directory)
+mkdir(images_directory)
+mkdir(pdfs_directory)
 
 def replace_image(match, download=True):
     """Rewrite an re match object that matched an image tag
@@ -121,15 +115,16 @@ def main(repo):
             md_content = ""
 
             # with open(md_filename, 'w') as f:
-            md_content += "# #{0} - {1} \n\n".format(number, title)
+            md_content += "# #{0} – {1} \n\n".format(number, title)
             md_content += "### Reported by @{0} \n\n".format(issue['user']['login'])
+            
             if issue['milestone']:
-              md_content += ' **Milestone**: {0} \n\n'.format(issue['milestone']['title'])
+                md_content += '**Milestone**: {0} \n\n'.format(issue['milestone']['title'])
            
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
-            #body = replace_checkboxes(body)
+            
             md_content += body
             md_content += "\n\n"
             if issue['comments'] > 0:
@@ -147,15 +142,14 @@ def main(repo):
                     comment_body = comment['body']
                     comment_body = re.sub(r'^(#+)', r'###\1', comment_body)
                     comment_body = replace_images(comment_body)
-                    md_content += (comment_body)
-                    md_content += ("\n\n")
-                    #md_content += ('new content')
+                    md_content += comment_body
+                    md_content += "\n\n"
 
-          # render to .tex file
+            # render to .tex file
             md_file_path = "./pdfs/issue_{}.md".format(number)
-            file = open(md_file_path, "w") 
-            file.write(md_content) 
-            file.close() 
+            file = open(md_file_path, "w")
+            file.write(md_content)
+            file.close()
 
             tex_file_path = "./tex/issue_{}.tex".format(number)
 
