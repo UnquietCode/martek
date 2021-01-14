@@ -40,6 +40,14 @@ PREAMBLE = """
 \\usepackage{ulem}
 \\usepackage{xcolor}
 \\usepackage{listings}
+\\lstset{
+  basicstyle=\\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  postbreak=\\mbox{\\textcolor{red}{$\\hookrightarrow$}\\space},
+  backgroundcolor=\colorgray!10
+}
 \\usepackage{etoolbox}
 \\usepackage{fancyvrb}
 \\usepackage{xunicode}
@@ -227,17 +235,14 @@ class LatexRenderer(BaseRenderer):
             rendered += f"\\item {line} \n"
 
         return rendered
-    
-    
+
     def render_block_code(self, token):
         innards = self.render_inner(token)
         rendered = \
-            "\\begin{mdframed}[backgroundcolor=gray!10]\n" \
-            "\\begin{lstlisting}\n" \
+            "\\begin{lstlisting}[backgroundcolor = \color{gray!10}]\n" \
             f"{innards}\n" \
             "\\end{lstlisting}\n" \
-            "\\end{mdframed}"
-        
+
         return rendered
 
 
