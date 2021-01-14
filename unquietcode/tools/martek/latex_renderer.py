@@ -164,10 +164,10 @@ class LatexRenderer(BaseRenderer):
             return f"\n{{\\subsection*{{{underlined(text)}}}}}\n"
         
         elif token.level >= 3:
-            return f"\n{{\\subsubsection*{{{text}}}}}\n" + BLANK_LINE
+            return f"\n{{\\subsubsection*{{{text}}}}}\n"
        
         else:
-            return f"\n{underlined(self.render_inner(token))}\n" + BLANK_LINE
+            return f"\n{underlined(self.render_inner(token))}\n"
     
         
     @staticmethod
