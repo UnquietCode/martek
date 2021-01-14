@@ -16,6 +16,7 @@ from datetime import datetime
 from mistletoe.ast_renderer import ASTRenderer
 from unquietcode.tools.martek import LatexRenderer 
 from mistletoe.latex_renderer import LaTeXRenderer
+import textwrap
 
 
 # This is a script that downloads all the GitHub issues in a
@@ -81,6 +82,13 @@ def replace_images(md):
 
     return re.sub(r'\!\[(.*?)\]\((.*?)\)', replace_image, md)
 
+def make_markdown_quote(to_quote):
+  return '>' + to_quote #latex handles the newlines for us so it's ok to just put everything in one block quote line
+  #return '>' + '\n>'.join(textwrap.wrap(str, 80, break_long_words=False))
+  #return ''.join([">" + str[i:i+80] + "\n" for i in range(0, len(str), 80)])
+
+def encode(to_encode):
+  return to_encode.encode('utf-8')
 
 def main(repo):
 
@@ -101,7 +109,7 @@ def main(repo):
         for issue in issues_json:
             #print('\n\n\n',json.dumps(issue, indent=2), '\n\n\n')
             number = issue['number']
-            print('reached issue #: ', number)
+            #print('reached issue #: ', number)
             pdf_filename = join(pdfs_directory,
                                         '{}.pdf'.format(number))
             # if exists(pdf_filename): #if the file is already there
@@ -110,6 +118,8 @@ def main(repo):
         
             title = issue['title']
             body = issue['body']
+            #print(body)
+            #print('body type is:\n\n\n\n\n\n\n\n\n', type(body))
             #print(title, body)
 
             # TODO use temp file instead of writing .tex file
@@ -129,6 +139,7 @@ def main(repo):
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
+            #body = encode(str(body))
             #body = replace_checkboxes(body)
             md_content += body
             md_content += "\n\n"
@@ -136,7 +147,7 @@ def main(repo):
                 comments_request = requests.get(issue['comments_url'],
                                                 headers=standard_headers)
                 for comment in comments_request.json():
-                    print(json.dumps(comment, indent=2)) 
+                    #print(json.dumps(comment, indent=2)) 
                     USER = comment['user']['login']
                     RAW_DATETIME = comment['created_at']
                     DATETIME_OBJ = datetime.strptime(RAW_DATETIME, '%Y-%m-%dT%H:%M:%SZ')
@@ -147,7 +158,8 @@ def main(repo):
                     comment_body = comment['body']
                     comment_body = re.sub(r'^(#+)', r'###\1', comment_body)
                     comment_body = replace_images(comment_body)
-                    md_content += (comment_body)
+                    #comment_body = comment_body.encode('utf-8')
+                    md_content += make_markdown_quote(comment_body)
                     md_content += ("\n\n")
                     #md_content += ('new content')
 
@@ -171,7 +183,7 @@ def main(repo):
               f.write(rendered)
               f.close()
 
-            subprocess.check_call(['pdflatex', '-aux-directory=./pdfs', '-output-directory=./pdfs', tex_file_path])
+            subprocess.check_call(['xelatex', '-aux-directory=./pdfs', '-output-directory=./pdfs', tex_file_path])
 
             # subprocess.check_call(['pandoc',
             #                        '-f',

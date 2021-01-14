@@ -43,6 +43,10 @@ from mistletoe.base_renderer import BaseRenderer
 #       self.meta = EscapeSequence.strip(match.group(2))
 
 # PREAMBLE = ""
+#\\usepackage{textcomp}
+#\\usepackage{lmodern}
+#\\usepackage{pifont}
+
 
 PREAMBLE = """
 \\documentclass{article}
@@ -53,14 +57,21 @@ PREAMBLE = """
 \\usepackage{listings}
 \\usepackage{etoolbox}
 \\usepackage{fancyvrb}
-\\usepackage[utf8]{inputenc}
+\\usepackage{xunicode}
+\\usepackage[english]{babel}
 \\usepackage[T1]{fontenc}
+
+\\usepackage{eurosym}
 \\usepackage{textcomp}
-\\usepackage{lmodern}
 \\usepackage{enumitem,amssymb}
 \\usepackage{cprotect}
-\\usepackage{pifont}
+\\usepackage{framed}
 \\usepackage{graphicx}
+
+\\usepackage{xltxtra}
+\\setmainfont{FreeSerif}
+\\setmonofont{FreeMono}
+
 \\graphicspath{ {./images/} }
 \\newcommand{\\cmark}{\\ding{51}}%
 \\newcommand{\\xmark}{\\ding{55}}%
@@ -300,7 +311,7 @@ class LatexRenderer(BaseRenderer):
         return f'{text}\\\\\n'  #\\vspace{{\\baselineskip}}\n'        
 
     def render_quote(self, token):
-        return f"\n\\begin{{quote}}\n{self.render_inner(token)}\n\\end{{quote}}\n"
+        return f"\n\\begin{{leftbar}}\n\\begin{{quote}}\n{self.render_inner(token)}\n\\end{{quote}}\n\\end{{leftbar}}\n"
     
     def render_list(self, token):
       self.packages['listings'] = []
