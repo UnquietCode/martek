@@ -1,23 +1,16 @@
-#!/usr/bin/env python
-
-import errno
 import hashlib
 import json
-from optparse import OptionParser
 import os
-from os.path import dirname, exists, isdir, join, realpath, relpath, splitext
 import re
-import requests
 import subprocess
-import tempfile
-import sys
-import mistletoe
 from datetime import datetime
-from mistletoe.ast_renderer import ASTRenderer
-from unquietcode.tools.martek import LatexRenderer 
-from mistletoe.latex_renderer import LaTeXRenderer
-import textwrap
+from optparse import OptionParser
+from os.path import dirname, exists, join, realpath, relpath, splitext
 
+import mistletoe
+import requests
+from mistletoe.ast_renderer import ASTRenderer
+from unquietcode.tools.martek import LatexRenderer
 
 # This is a script that downloads all the GitHub issues in a
 # particular repository and generates a PDF for each one; the idea is
@@ -32,20 +25,19 @@ standard_headers = {'User-Agent': 'github-issues-printer/1.0',
 
 cwd = os.getcwd()
 repo_directory = realpath(join(dirname(__file__)))
-images_directory = relpath(join(repo_directory, 'images'), cwd)
+tex_directory = relpath(join(repo_directory, 'tex'), cwd)
+images_directory = relpath(join(tex_directory, 'images'), cwd)
 pdfs_directory = relpath(join(repo_directory, 'pdfs'), cwd)
 
-def mkdir_p(d):
+def mkdir(d):
     try:
-        os.makedirs(d)
-    except OSError as e:
-        if e.errno == errno.EEXIST and isdir(d):
-            pass
-        else:
-            raise
+        os.mkdir(d)
+    except FileExistsError:
+        pass
 
-mkdir_p(images_directory)
-mkdir_p(pdfs_directory)
+mkdir(tex_directory)
+mkdir(images_directory)
+mkdir(pdfs_directory)
 
 def replace_image(match, download=True):
     """Rewrite an re match object that matched an image tag
@@ -83,12 +75,12 @@ def replace_images(md):
     return re.sub(r'\!\[(.*?)\]\((.*?)\)', replace_image, md)
 
 def make_markdown_quote(to_quote):
-  return '>' + to_quote #latex handles the newlines for us so it's ok to just put everything in one block quote line
-  #return '>' + '\n>'.join(textwrap.wrap(str, 80, break_long_words=False))
-  #return ''.join([">" + str[i:i+80] + "\n" for i in range(0, len(str), 80)])
+    return '>' + to_quote #latex handles the newlines for us so it's ok to just put everything in one block quote line
+    #return '>' + '\n>'.join(textwrap.wrap(str, 80, break_long_words=False))
+    #return ''.join([">" + str[i:i+80] + "\n" for i in range(0, len(str), 80)])
 
 def encode(to_encode):
-  return to_encode.encode('utf-8')
+    return to_encode.encode('utf-8')
 
 def main(repo):
 
@@ -112,35 +104,25 @@ def main(repo):
             #print('reached issue #: ', number)
             pdf_filename = join(pdfs_directory,
                                         '{}.pdf'.format(number))
-            # if exists(pdf_filename): #if the file is already there
-            #     #print(pdf_filename)
-            #     continue
         
             title = issue['title']
             body = issue['body']
-            #print(body)
-            #print('body type is:\n\n\n\n\n\n\n\n\n', type(body))
-            #print(title, body)
 
             # TODO use temp file instead of writing .tex file
             # ntf = tempfile.NamedTemporaryFile(suffix='.tex', delete=True)
             # md_filename = ntf.name
 
-            # if issue.get('pull_request') and issue['pull_request'].get('html_url'):
-            #     continue
             md_content = ""
-
-            # with open(md_filename, 'w') as f:
-            md_content += "# #{0} - {1} \n\n".format(number, title)
+            md_content += "# #{0} – {1} \n\n".format(number, title)
             md_content += "### Reported by @{0} \n\n".format(issue['user']['login'])
+            
             if issue['milestone']:
-              md_content += ' **Milestone**: {0} \n\n'.format(issue['milestone']['title'])
+                md_content += '**Milestone**: {0} \n\n'.format(issue['milestone']['title'])
            
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
-            #body = encode(str(body))
-            #body = replace_checkboxes(body)
+            
             md_content += body
             md_content += "\n\n"
             if issue['comments'] > 0:
@@ -158,41 +140,27 @@ def main(repo):
                     comment_body = comment['body']
                     comment_body = re.sub(r'^(#+)', r'###\1', comment_body)
                     comment_body = replace_images(comment_body)
-                    #comment_body = comment_body.encode('utf-8')
-                    md_content += make_markdown_quote(comment_body)
-                    md_content += ("\n\n")
-                    #md_content += ('new content')
+                    md_content += comment_body
+                    md_content += "\n\n"
 
-          # render to .tex file
+            # render to .tex file
             md_file_path = "./pdfs/issue_{}.md".format(number)
-            file = open(md_file_path, "w") 
-            file.write(md_content) 
-            file.close() 
+            file = open(md_file_path, "w")
+            file.write(md_content)
+            file.close()
 
             tex_file_path = "./tex/issue_{}.tex".format(number)
 
-            # subprocess.check_call(['python3', 'test.py', md_file_path])
-            # subprocess.check_call(['pdflatex', tex_file_path])
-
             with open(md_file_path, 'r') as fin:
-              data = fin.read()
-              rendered = mistletoe.markdown(data, LatexRenderer)
-              ast = mistletoe.markdown(data, ASTRenderer)
+                data = fin.read()
+                rendered = mistletoe.markdown(data, LatexRenderer)
+                ast = mistletoe.markdown(data, ASTRenderer)
 
-              f = open(tex_file_path, "w")
-              f.write(rendered)
-              f.close()
+                f = open(tex_file_path, "w")
+                f.write(rendered)
+                f.close()
 
             subprocess.check_call(['xelatex', '-aux-directory=./pdfs', '-output-directory=./pdfs', tex_file_path])
-
-            # subprocess.check_call(['pandoc',
-            #                        '-f',
-            #                        'latex',
-            #                        pdf_filename+'.tex',
-            #                        '-o',
-            #                        pdf_filename,
-            #                        '--pdf-engine', 'xelatex'])
-            #os.remove(ntf.name)
 
         page += 1
         if 'Link' not in r.headers:
@@ -201,10 +169,7 @@ def main(repo):
 usage = """Usage: %prog [options] REPOSITORY
 Repository should be username/repository from GitHub, e.g. mysociety/pombola"""
 parser = OptionParser(usage=usage)
-parser.add_option("-t", "--test",
-                  action="store_true", dest="test", default=False,
-                  help="Run doctests")
-
+parser.add_option("-t", "--test", action="store_true", dest="test", default=False, help="Run doctests")
 (options, args) = parser.parse_args()
 
 if len(args) != 1:
