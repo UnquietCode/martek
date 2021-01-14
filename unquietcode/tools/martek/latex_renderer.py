@@ -86,18 +86,12 @@ PREAMBLE = """
 \\newcommand*{\\hDFont}{\\Large{\\fontfamily{otf}\\selectfont}}
 \\newcommand*{\\hEFont}{\\large{\\fontfamily{otf}\\selectfont}}
 \\newcommand*{\\hFFont}{\\centerline{\\normalsize{\\fontfamily{otf}\\selectfont}}}
-""" 
-
-#\\newcommand{\\wontfix}{\\rlap{$\\square$}{\\large\\hspace{1pt}\\xmark}}\\square$}{\\raisebox{2pt}{\\large\\hspace{1pt}\\cmark}}%
-
-#
-#""" #\\AtBeginEnvironment{quote}{\\singlespacing\\small}
+"""
 
 POSTAMBLE = "\\end{document}"
 
 TRAILING_WHITESPACE = ""
 
-#BLANK_LINE = " \n \\vspace{\\baselineskip} \n " #this isn't an f string so we only need single {}
 NEW_LINE = "\\mbox\\\\\n"
 INDENT = "\\indent\n" 
 BLANK_LINE = NEW_LINE + NEW_LINE + INDENT #this feels hacky and stupid but I can't find a better way to skip a line without Latex filling the previous line with later text
@@ -355,11 +349,11 @@ class LatexRenderer(BaseRenderer):
     def render_block_code(self, token):
         innards = self.render_inner(token)
         rendered = \
-          "\\begin{mdframed}[backgroundcolor=gray!10]\n" \
-          "\\begin{lstlisting}\n" \
-          f"{innards}\n" \
-          "\\end{lstlisting}\n" \
-          "\\end{mdframed}" \
+            "\\begin{mdframed}[backgroundcolor=gray!10]\n" \
+            "\\begin{lstlisting}\n" \
+            f"{innards}\n" \
+            "\\end{lstlisting}\n" \
+            "\\end{mdframed}" \
         
         # {innards}
         # \end{{lstlisting}}
