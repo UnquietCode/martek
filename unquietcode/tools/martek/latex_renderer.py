@@ -191,14 +191,6 @@ class LatexRenderer(BaseRenderer):
         line = "=" * (max(len(lines[0]), len(lines[-1])) -1)
         
         return f"{line}\n\n{text}\n{line}\n"
-    
-    
-    # def render_escape_sequence(self, token):
-    #     if self.render_inner(token) == "\\":
-    #         return "QQ"
-    #     else:
-    #         return super().render_escape_sequence(self, token)
-
 
     def render_thematic_break(self, token):
         return '\n\\hrulefill\n'
