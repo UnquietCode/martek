@@ -217,21 +217,23 @@ class LatexRenderer(BaseRenderer):
         self.packages['listings'] = []
         template = '\\begin{{{tag}}}\n{inner}\\end{{{tag}}}\n'
         tag = 'enumerate' if token.start is not None else 'itemize'
-        inner = '\n'.join([self.render(child) for child in token.children])
+        inner = ' '.join([self.render(child) for child in token.children])
         return template.format(tag=tag, inner=inner)
 
     
     def render_list_item(self, token):
         rendered = ""
         line = self.render_inner(token)
-        
-        line = line.strip()
+
+        if line.strip() != '':
+            line = line.strip()
+        else:
+            line = '---'  #arbitrary non-empty token that is necessary for latex to not complain about having a list with no elements. Design feedback welcome
         if line:
-            print(line[:3])
             if line[:3] == '[x]':
-                line = CHECKED_BOX + line[3:]
+                line = CHECKED_BOX + line[3:-2]
             elif line[:3] == '[ ]':
-                line = UNCHECKED_BOX + line[3:]
+                line = UNCHECKED_BOX + line[3:-2]
             rendered += f"\\item {line} \n"
 
         return rendered
