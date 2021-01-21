@@ -3,6 +3,7 @@ import math
 import textwrap
 import random
 import re
+from contextlib import contextmanager
 
 from mistletoe.base_renderer import BaseRenderer
 
@@ -66,12 +67,11 @@ PREAMBLE = """
 \\setmonofont{FreeMono}
 
 \\graphicspath{ {./images/} }
-\\newcommand{\\cmark}{\\ding{51}}%
-\\newcommand{\\xmark}{\\ding{55}}%
-\\newcommand{\\done}{\\rlap{$\\square$}{\\raisebox{2pt}{\\large\\hspace{1pt}\\cmark}}%
-\\hspace{-2.5pt}}
+\\newcommand{\\checkedbox}{\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}}
+\\newcommand{\\uncheckedbox}{$\\square$}
 \\setlength{\\parindent}{0pt}
-\n\\begin{document}
+
+\\begin{document}
 \\definecolor{code-background}{gray}{.95}
 """
 
@@ -79,10 +79,6 @@ POSTAMBLE = "\\end{document}"
 
 NEW_LINE = "\\mbox\\\\\n"
 INDENT = "\\indent\n"
-BLANK_LINE = NEW_LINE + NEW_LINE
-
-UNCHECKED_BOX = "$\square$"
-CHECKED_BOX = '\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}'
 
 def underlined(text):
     return f"\\underline{{{text}}}"
@@ -102,11 +98,25 @@ class LatexRenderer(BaseRenderer):
     def __init__(self):
         super().__init__()
         self.packages = {}
-        self.render_map['BlockCode'] = self.render_banner
+        self._indent = -1
+        
+    @property
+    def indent(self):
+        return '  ' * self._indent
     
+    @contextmanager
+    def indentation(self):
+        self._indent += 1
+        yield
+        self._indent -= 1
+
     def render_document(self, token):
         rendered = PREAMBLE
-        rendered += self.render_inner(token)
+
+        inner = self.render_inner(token)
+        # inner = re.sub(r'(\S+)\n{2,}(\s*)([^\\{\s])', r'\1\mbox{}\\\\\n\n\2\3', inner, flags=re.MULTILINE)
+        
+        rendered += inner
         rendered += POSTAMBLE
         return rendered
 
@@ -121,7 +131,9 @@ class LatexRenderer(BaseRenderer):
 
     def render_raw_text(self, token):
         rtn = self.render_to_plain(token)
-        rtn = re.sub(r'(\\)',r'\\textbackslash ', rtn)
+        # rtn = re.sub(r'(\\)([^\n])',r'\\textbackslash\1', rtn)
+
+        rtn = re.sub(r'(\\)', r'\\textbackslash ', rtn)
         rtn = re.sub(r'([\&\%\$\#\_\{\}~\^])',r'\\\1', rtn)
         
         return rtn
@@ -142,11 +154,11 @@ class LatexRenderer(BaseRenderer):
 
 
     def render_inline_code(self, token):
-        return f"\colorbox{{code-background}}{{\\texttt{{{self.render_inner(token)}}}}}" + BLANK_LINE
+        return f"\colorbox{{code-background}}{{\\texttt{{{self.render_inner(token)}}}}}"
 
 
     def render_line_break(self, token):
-        return '\n' if token.soft else '\\newline\n'
+        return '\n' if token.soft else '\\mbox{}\n'
 
 
     def render_link(self, token):
@@ -166,17 +178,18 @@ class LatexRenderer(BaseRenderer):
         text = self.render_inner(token)
         
         if token.level == 1:
-            return f"\n{{\\section*{{{text}}}}}\n"
+            heading = f"{{\\section*{{{text}}}}}"
 
         elif token.level == 2:
-            return f"\n{{\\subsection*{{{underlined(text)}}}}}\n"
+            heading = f"{{\\subsection*{{{underlined(text)}}}}}"
         
         elif token.level >= 3:
-            return f"\n{{\\subsubsection*{{{text}}}}}\n"
+            heading = f"{{\\subsubsection*{{{text}}}}}"
        
         else:
-            return f"\n{underlined(self.render_inner(token))}\n"
-    
+            heading = f"{underlined(self.render_inner(token))}"
+        
+        return f"\n{heading}\n"
         
     @staticmethod
     def invert_case(text):
@@ -192,21 +205,13 @@ class LatexRenderer(BaseRenderer):
         
         return ''.join(new)
     
-    
-    def render_banner(self, token):
-        text = self.render_inner(token)
-        lines = text.splitlines()
-        line = "=" * (max(len(lines[0]), len(lines[-1])) -1)
-        
-        return f"{line}\n\n{text}\n{line}\n"
 
     def render_thematic_break(self, token):
         return '\n\\hrulefill\n'
     
     
     def render_paragraph(self, token):
-        text = self.render_inner(token)
-        return f'{text}\\\\\n\n' #do we want this after?
+        return f'\n{self.render_inner(token)}\n'
 
 
     def render_quote(self, token):
@@ -215,28 +220,31 @@ class LatexRenderer(BaseRenderer):
     
     def render_list(self, token):
         self.packages['listings'] = []
-        template = '\\begin{{{tag}}}\n{inner}\\end{{{tag}}}\n'
         tag = 'enumerate' if token.start is not None else 'itemize'
-        inner = ' '.join([self.render(child) for child in token.children])
-        return template.format(tag=tag, inner=inner)
-
+        
+        with self.indentation():
+            rendered = f"\n{self.indent}\\begin{{{tag}}}"
+            
+            with self.indentation():
+                rendered += f"\n{self.render_inner(token)}"
+            
+            rendered += f"{self.indent}\\end{{{tag}}}\n"
+        
+        return rendered
+    
     
     def render_list_item(self, token):
-        rendered = ""
         line = self.render_inner(token)
-
-        if line.strip() != '':
-            line = line.strip()
-        else:
-            line = '---'  #arbitrary non-empty token that is necessary for latex to not complain about having a list with no elements. Design feedback welcome
-        if line:
-            if line[:3] == '[x]':
-                line = CHECKED_BOX + line[3:-2]
-            elif line[:3] == '[ ]':
-                line = UNCHECKED_BOX + line[3:-2]
-            rendered += f"\\item {line} \n"
-
+        
+        if not line.strip():
+            line = '---'  # arbitrary non-empty token that is necessary for latex to not complain about having a list with no elements. Design feedback welcome
+        
+        line = re.sub(r'^(\s*)\[x]', r'\1\\checkedbox{}', line)
+        line = re.sub(r'^(\s*)\[ ]', r'\1\\uncheckedbox{}', line)
+        
+        rendered = f"{self.indent}\\item {line.strip()}\n"
         return rendered
+
 
     def render_block_code(self, token):
         innards = self.render_inner(token)
