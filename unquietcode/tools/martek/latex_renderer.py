@@ -168,9 +168,10 @@ class LatexRenderer(BaseRenderer):
         
         def newlines(text):
             # replacement = uuid.uuid4().hex
-            text = re.sub(r'^\\\\$', '', text, flags=re.MULTILINE)
-            # text = re.sub(r'\n*'+replacement, '', text, flags=re.MULTILINE)
-            return re.sub(r'\n{3,}(\s*[^\\]\S+)', r'\\mbox{}\\\\\n\1', text, flags=re.MULTILINE)
+            # text = re.sub(r'^\\\\$', replacement, text, flags=re.MULTILINE)
+            text = re.sub(r'(\S+)\n{2,}(\s*[^\\]\S+)', r'\1\\mbox{}\\\\\n\n\2', text, flags=re.MULTILINE)
+            # text = re.sub(replacement, '', text, flags=re.MULTILINE)
+            return text
 
         self.start_block(action=newlines)
         self.push(PREAMBLE, "\n")
