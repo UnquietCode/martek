@@ -81,6 +81,7 @@ PREAMBLE = """
 
 POSTAMBLE = "\\end{document}"
 
+BLANK_LINE = "\\mbox{}"
 NEW_LINE = "\\mbox\\\\\n"
 INDENT = "\\indent\n"
 
@@ -120,7 +121,6 @@ class LatexRenderer(BaseRenderer):
         for element in elements:
             self.stack[-1].push(element)
     
-    
     def pop(self):
         return self.stack.pop()
     
@@ -143,21 +143,28 @@ class LatexRenderer(BaseRenderer):
     
     
     def start_block(self, string: str = None) -> Block:
-        if string is not None:
-            self.push(string)
-        
         block = Block()
-        self.push(block)
-        self.stack.append(block)
         
+        if string is not None:
+            block.prefix = string
+        
+        # need to un-nest
+        for idx in reversed(range(len(self.stack))):
+            element = self.stack[idx]
+            
+            if type(element) is Block:
+                element.push(block)
+                break
+
+        self.stack.append(block)
         return block
     
     
     def end_block(self, string: str = None):
-        self.stack.pop()
-
+        block = self.pop()
+        
         if string is not None:
-            self.push(string)
+            block.suffix = string
 
     
     def render_document(self, token):
@@ -170,7 +177,7 @@ class LatexRenderer(BaseRenderer):
         self.push(inner)
         self.push(POSTAMBLE)
         self.end_block()
-        
+
         return self.stack[0].render(indent=-2)
 
 
@@ -219,8 +226,9 @@ class LatexRenderer(BaseRenderer):
 
     def render_line_break(self, token):
         print("NEWLINE")
-        self.push('\n' if token.soft else '\\mbox{}\n')
-
+        self.push('' if token.soft else '\\mbox{}\n')
+        # self.push(BLANK_LINE)
+    
 
     def render_link(self, token):
         def href(text):
@@ -236,7 +244,7 @@ class LatexRenderer(BaseRenderer):
 
     def render_image(self, token):
         self.packages['graphicx'] = []
-        self.push('\n\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{}}}\n'.format(token.src))
+        self.push(f'\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{token.src}}}', '')
 
 
     def render_heading(self, token):
@@ -254,7 +262,6 @@ class LatexRenderer(BaseRenderer):
 
         with self.span(heading):
             self.render_inner(token)
-            self.push('')
         
     
     @staticmethod
@@ -277,9 +284,9 @@ class LatexRenderer(BaseRenderer):
     
     
     def render_paragraph(self, token):
-        # self.push("\n")
+        # self.push('')
         self.render_inner(token)
-        # self.push("\n")
+        self.push("")
 
 
     def render_quote(self, token):
@@ -292,9 +299,11 @@ class LatexRenderer(BaseRenderer):
         self.packages['listings'] = []
         tag = 'enumerate' if token.start is not None else 'itemize'
         
+        self.push('')
         self.start_block(f"\\begin{{{tag}}}")
         self.render_inner(token)
         self.end_block(f"\\end{{{tag}}}")
+        self.push('')
     
         
     def render_list_item(self, token):

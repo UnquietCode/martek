@@ -10,6 +10,9 @@ class String:
     
     def render(self, indent=0):
         return ('  '*indent) + self.value
+    
+    def __repr__(self):
+        return self.value
 
 
 class Container:
@@ -27,42 +30,51 @@ class Container:
 
 
 class Span(Container):
+    
+    def push(self, element: Element):
+        if type(element) is Block:
+            raise Exception("spans cannot contain blocks")
 
+        Container.push(self, element)
+    
+    
     def render(self, indent=0):
-        rendered = "".join([_.render() for _ in self.elements])
+        indentation = '  '*indent
+        rendered = ""
+        
+        for idx, element in enumerate(self.elements):
+            if type(element) is Block:
+                raise Exception("spans cannot contain blocks")
+            
+            rendered += element.render()
         
         if self.action is not None:
             rendered = self.action(rendered)
             
-        return ('  '*indent) + rendered
+        return indentation + rendered
 
 
 class Block(Container):
     
+    def __init__(self, prefix=None, suffix=None):
+        super().__init__()
+        self.prefix = prefix
+        self.suffix = suffix
+
+    
     def render(self, indent=0):
-        rendered = f"\n{'  ' * indent}".join([_.render(indent=indent+1) for _ in self.elements])
+        indentation = '  '*indent
+        rendered = ""
         
+        if self.prefix is not None:
+            rendered += f"{indentation}{self.prefix}\n"
+        
+        rendered += f"\n".join([_.render(indent=indent+1) for _ in self.elements])
+
+        if self.suffix is not None:
+            rendered += f"\n{indentation}{self.suffix}"
+                       
         if self.action is not None:
             rendered = self.action(rendered)
-        
+
         return rendered
-        
-        # actions = []
-        # 
-        # for element in self.elements:
-        #     element_type = type(element)
-        #     
-        #     if element_type is str:
-        #         content = ('  ' * indent).join(element.splitlines(keepends=True))
-        #         rendered += actions.pop()(content) if actions else content
-        #     
-        #     elif element_type is Block:
-        #         indent += 1
-        #         rendered += "\n"
-        #         content = element.render(indent=indent+1)
-        #         rendered += actions.pop()(content) if actions else content
-        # 
-        #     elif element_type is callable:
-        #         actions.append(element)
-        #     
-        # return rendered
