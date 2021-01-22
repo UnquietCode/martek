@@ -56,10 +56,11 @@ class Span(Container):
 
 class Block(Container):
     
-    def __init__(self, prefix=None, suffix=None):
+    def __init__(self, prefix=None, suffix=None, action=None):
         super().__init__()
         self.prefix = prefix
         self.suffix = suffix
+        self.action = action
 
     
     def render(self, indent=0):

@@ -1,7 +1,4 @@
-import shutil
-import math
-import textwrap
-import random
+import uuid
 import re
 from contextlib import contextmanager
 from typing import List
@@ -81,9 +78,9 @@ PREAMBLE = """
 
 POSTAMBLE = "\\end{document}"
 
-BLANK_LINE = "\\mbox{}"
-NEW_LINE = "\\mbox\\\\\n"
-INDENT = "\\indent\n"
+# BLANK_LINE = "\\mbox{}"
+# NEW_LINE = "\\mbox\\\\\n"
+# INDENT = "\\indent\n"
 
 def underlined(text):
     return f"\\underline{{{text}}}"
@@ -142,8 +139,8 @@ class LatexRenderer(BaseRenderer):
         self.stack.pop()
     
     
-    def start_block(self, string: str = None) -> Block:
-        block = Block()
+    def start_block(self, string: str = None, action=None) -> Block:
+        block = Block(action=action)
         
         if string is not None:
             block.prefix = string
@@ -168,13 +165,19 @@ class LatexRenderer(BaseRenderer):
 
     
     def render_document(self, token):
-        self.start_block()
+        
+        def newlines(text):
+            # replacement = uuid.uuid4().hex
+            text = re.sub(r'^\\\\$', '', text, flags=re.MULTILINE)
+            # text = re.sub(r'\n*'+replacement, '', text, flags=re.MULTILINE)
+            return re.sub(r'\n{3,}(\s*[^\\]\S+)', r'\\mbox{}\\\\\n\1', text, flags=re.MULTILINE)
+
+        self.start_block(action=newlines)
         self.push(PREAMBLE, "\n")
         
-        inner = self.render_inner(token)
-        #inner = re.sub(r'(\S+)\n{2,}(\s*)([^\\{\s])', r'\1\mbox{}\\\\\n\n\2\3', inner, flags=re.MULTILINE)
+        self.render_inner(token)
         
-        self.push(inner)
+        # self.push(inner)
         self.push(POSTAMBLE)
         self.end_block()
 
@@ -226,7 +229,12 @@ class LatexRenderer(BaseRenderer):
 
     def render_line_break(self, token):
         print("NEWLINE")
-        self.push('' if token.soft else '\\mbox{}\n')
+        if token.soft:
+            self.push('\\\\')
+        # else:
+        #     self.push("\\mbox{}\\\\\n")
+        
+        # self.push('' if token.soft 
         # self.push(BLANK_LINE)
     
 
@@ -284,9 +292,8 @@ class LatexRenderer(BaseRenderer):
     
     
     def render_paragraph(self, token):
-        # self.push('')
         self.render_inner(token)
-        self.push("")
+        self.push('')
 
 
     def render_quote(self, token):
