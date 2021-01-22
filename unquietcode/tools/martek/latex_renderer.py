@@ -1,8 +1,7 @@
-import uuid
 import re
 from contextlib import contextmanager
-from typing import List
 from functools import reduce
+from typing import List
 
 from mistletoe.base_renderer import BaseRenderer
 
@@ -37,11 +36,12 @@ from .elements import Block, Span, Container
 
 PREAMBLE = """
 \\documentclass{article}
+
+%-PACKAGES-%
+
 \\usepackage{mdframed}
-\\usepackage{hyperref}
 \\usepackage{ulem}
 \\usepackage{xcolor}
-\\usepackage{listings}
 \\lstset{
   basicstyle=\\ttfamily,
   columns=fullflexible,
@@ -55,13 +55,11 @@ PREAMBLE = """
 \\usepackage{xunicode}
 \\usepackage[english]{babel}
 \\usepackage[T1]{fontenc}
-
 \\usepackage{eurosym}
 \\usepackage{textcomp}
 \\usepackage{enumitem,amssymb}
 \\usepackage{cprotect}
 \\usepackage{framed}
-\\usepackage{graphicx}
 
 \\usepackage{xltxtra}
 \\setmainfont{FreeSerif}
@@ -72,11 +70,41 @@ PREAMBLE = """
 \\newcommand{\\uncheckedbox}{$\\square$}
 \\setlength{\\parindent}{0pt}
 
+\\newlength{\\leftbarwidth}
+\\setlength{\\leftbarwidth}{2pt}
+\\newlength{\\leftbarsep}
+\\setlength{\\leftbarsep}{8pt}
+\\definecolor{light-gray}{gray}{0.85}
+\\newcommand*{\\leftbarcolorcmd}{\\color{leftbarcolor}}%
+\\colorlet{leftbarcolor}{light-gray}
+
+\\renewenvironment{leftbar}{%
+  \\def\\FrameCommand{{\\leftbarcolorcmd{\\vrule width \\leftbarwidth\\relax\\hspace {\\leftbarsep}}}}%
+  \\MakeFramed {\\advance \\hsize -\\width \\FrameRestore }%
+  }{%
+  \\endMakeFramed
+}
+
 \\begin{document}
 \\definecolor{code-background}{gray}{.95}
 """[1:-1]
 
 POSTAMBLE = "\\end{document}"
+
+PACKAGES = {}
+
+def packages(**packages):
+    for k, v in packages.items():
+        if k in PACKAGES:
+            PACKAGES[k].extend(v)
+        else:
+            PACKAGES[k] = v
+    
+    def wrapper(fn):
+        return fn
+    
+    return wrapper
+    
 
 # BLANK_LINE = "\\mbox{}"
 # NEW_LINE = "\\mbox\\\\\n"
@@ -102,7 +130,6 @@ class LatexRenderer(BaseRenderer):
 
     def __init__(self):
         super().__init__()
-        self.packages = {}
         self.stack: List[Container] = [Block()]
         
         old_render = self.render
@@ -163,6 +190,7 @@ class LatexRenderer(BaseRenderer):
         if string is not None:
             block.suffix = string
 
+    ########################################################################
     
     def render_document(self, token):
         
@@ -173,12 +201,15 @@ class LatexRenderer(BaseRenderer):
             # text = re.sub(replacement, '', text, flags=re.MULTILINE)
             return text
 
+        packages = '\n'.join([
+            f'\\usepackage{options or ""}{{{package}}}'
+            for package, options in PACKAGES.items()
+        ])
+        preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
+
         self.start_block(action=newlines)
-        self.push(PREAMBLE, "\n")
-        
+        self.push(preamble, "\n")
         self.render_inner(token)
-        
-        # self.push(inner)
         self.push(POSTAMBLE)
         self.end_block()
 
@@ -238,7 +269,7 @@ class LatexRenderer(BaseRenderer):
         # self.push('' if token.soft 
         # self.push(BLANK_LINE)
     
-
+    @packages(hyperref=[])
     def render_link(self, token):
         def href(text):
             return f'\\href{{{token.target}}}{{{text}}}'
@@ -250,9 +281,9 @@ class LatexRenderer(BaseRenderer):
     def render_auto_link(self, token):
         self.push(f'\\url{{{token.target}}}')
 
-
+    
+    @packages(graphicx=[])
     def render_image(self, token):
-        self.packages['graphicx'] = []
         self.push(f'\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{token.src}}}', '')
 
 
@@ -296,15 +327,15 @@ class LatexRenderer(BaseRenderer):
         self.render_inner(token)
         self.push('')
 
-
+    
     def render_quote(self, token):
-        self.start_block(f"\\begin{{leftbar}}\n\\begin{{quote}}")
+        self.start_block('\\begin{leftbar}{\\color{gray}')
         self.render_inner(token)
-        self.end_block("\\end{{quote}}\n\\end{{leftbar}}")
+        self.end_block('}\\end{leftbar}')
     
     
+    @packages(listings=[])
     def render_list(self, token):
-        self.packages['listings'] = []
         tag = 'enumerate' if token.start is not None else 'itemize'
         
         self.push('')
