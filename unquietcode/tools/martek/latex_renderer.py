@@ -166,8 +166,8 @@ class LatexRenderer(BaseRenderer):
         self.stack.pop()
     
     
-    def start_block(self, string: str = None, action=None) -> Block:
-        block = Block(action=action)
+    def start_block(self, string: str = None, action=None, deindent=None) -> Block:
+        block = Block(action=action, deindent=deindent)
         
         if string is not None:
             block.prefix = string
@@ -320,7 +320,7 @@ class LatexRenderer(BaseRenderer):
     
 
     def render_thematic_break(self, token):
-        self.push('', '\\hrulefill', '')
+        self.push('\\mbox{}', '\\hrulefill', '\\mbox{}\n')
     
     
     def render_paragraph(self, token):
@@ -365,8 +365,9 @@ class LatexRenderer(BaseRenderer):
                 self.render_inner(token)
 
       
+    @packages(listings=[])
     def render_block_code(self, token):
-        self.start_block("\\begin{lstlisting}[backgroundcolor = \\color{gray!10}]")
+        self.start_block("\\begin{lstlisting}[backgroundcolor = \\color{gray!10}]", deindent=True)
         self.render_inner(token)
         self.end_block("\\end{lstlisting}\n")
 

@@ -56,11 +56,12 @@ class Span(Container):
 
 class Block(Container):
     
-    def __init__(self, prefix=None, suffix=None, action=None):
+    def __init__(self, prefix=None, suffix=None, action=None, deindent=None):
         super().__init__()
         self.prefix = prefix
         self.suffix = suffix
         self.action = action
+        self.deindent = deindent
 
     
     def render(self, indent=0):
@@ -70,7 +71,12 @@ class Block(Container):
         if self.prefix is not None:
             rendered += f"{indentation}{self.prefix}\n"
         
-        rendered += f"\n".join([_.render(indent=indent+1) for _ in self.elements])
+        if self.deindent is True:
+            block_indent = indent
+        else:
+            block_indent = indent + 1
+        
+        rendered += f"\n".join([_.render(indent=block_indent) for _ in self.elements])
 
         if self.suffix is not None:
             rendered += f"\n{indentation}{self.suffix}"
