@@ -1,0 +1,52 @@
+name: Create PDF from Markdowwn
+description: |
+  Creates a PDF file from the given markdown input,
+  using UnquietCode/martek to generate and render
+  LaTeX into a PDF document.
+
+inputs:
+  content:
+    description: UTF-8 encoded markdown string
+    required: false
+  content64:
+    description: Base64 encoded UTF-8 markdown string
+    required: false
+  contentURL:
+    description: a public URL where markdown content can be downloaded
+    required: false
+
+runs:
+  using: composite
+  steps: 
+ 
+    - id: create-tree
+      name: create a bare tree
+      uses: actions/github-script@v3
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.git.createTree({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tree: [{
+               path: 'dummy',
+               mode': '100644',
+               type': 'blob',
+               content': "",              
+            }]
+          })
+    - id: create-branch
+      name: create a bare branch
+      uses: actions/github-script@v3
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.git.createRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: 'refs/heads/${{ github.event.inputs.name }}',
+            sha: '${{ steps.create-tree.outputs.result.sha }}',
+          })
+branding:
+  icon: git-commit
+  color: gray-dark
