@@ -99,26 +99,26 @@ def main(repo):
 
         issues_json = r.json()
         for issue in issues_json:
-            #print('\n\n\n',json.dumps(issue, indent=2), '\n\n\n')
             number = issue['number']
-            #print('reached issue #: ', number)
-            pdf_filename = join(pdfs_directory,
-                                        '{}.pdf'.format(number))
-        
             title = issue['title']
             body = issue['body']
+
+            # if number != 14:
+            #     continue
 
             # TODO use temp file instead of writing .tex file
             # ntf = tempfile.NamedTemporaryFile(suffix='.tex', delete=True)
             # md_filename = ntf.name
 
             md_content = ""
-            md_content += "# #{0} – {1} \n\n".format(number, title)
-            md_content += "### Reported by @{0} \n\n".format(issue['user']['login'])
+            md_content += "# #{0} – {1}\n".format(number, title)
+            md_content += "**Reported by @{0}**\n".format(issue['user']['login'])
             
             if issue['milestone']:
-                md_content += '**Milestone**: {0} \n\n'.format(issue['milestone']['title'])
+                md_content += '**Milestone: {0}**\n'.format(issue['milestone']['title'])
            
+            md_content += "\n"
+            
             # Increase the indent level of any Markdown heading
             body = re.sub(r'^(#+)', r'#\1', body)
             body = replace_images(body)
@@ -160,7 +160,7 @@ def main(repo):
                 f.write(rendered)
                 f.close()
 
-            subprocess.check_call(['xelatex', '-aux-directory=./pdfs', '-output-directory=./pdfs', tex_file_path])
+            subprocess.check_call(['xelatex', '-output-directory=./pdfs', tex_file_path])
 
         page += 1
         if 'Link' not in r.headers:

@@ -1,10 +1,11 @@
-import shutil
-import math
-import textwrap
-import random
 import re
+from contextlib import contextmanager
+from functools import reduce
+from typing import List
 
 from mistletoe.base_renderer import BaseRenderer
+
+from .elements import Block, Span, Container
 
 # 'Document':       self.render_document,
 # 'Strong':         self.render_strong,
@@ -35,11 +36,12 @@ from mistletoe.base_renderer import BaseRenderer
 
 PREAMBLE = """
 \\documentclass{article}
+
+%-PACKAGES-%
+
 \\usepackage{mdframed}
-\\usepackage{hyperref}
 \\usepackage{ulem}
 \\usepackage{xcolor}
-\\usepackage{listings}
 \\lstset{
   basicstyle=\\ttfamily,
   columns=fullflexible,
@@ -53,36 +55,60 @@ PREAMBLE = """
 \\usepackage{xunicode}
 \\usepackage[english]{babel}
 \\usepackage[T1]{fontenc}
-
 \\usepackage{eurosym}
 \\usepackage{textcomp}
 \\usepackage{enumitem,amssymb}
 \\usepackage{cprotect}
 \\usepackage{framed}
-\\usepackage{graphicx}
 
 \\usepackage{xltxtra}
 \\setmainfont{FreeSerif}
 \\setmonofont{FreeMono}
 
 \\graphicspath{ {./images/} }
-\\newcommand{\\cmark}{\\ding{51}}%
-\\newcommand{\\xmark}{\\ding{55}}%
-\\newcommand{\\done}{\\rlap{$\\square$}{\\raisebox{2pt}{\\large\\hspace{1pt}\\cmark}}%
-\\hspace{-2.5pt}}
+\\newcommand{\\checkedbox}{\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}}
+\\newcommand{\\uncheckedbox}{$\\square$}
 \\setlength{\\parindent}{0pt}
-\n\\begin{document}
+
+\\newlength{\\leftbarwidth}
+\\setlength{\\leftbarwidth}{2pt}
+\\newlength{\\leftbarsep}
+\\setlength{\\leftbarsep}{8pt}
+\\definecolor{light-gray}{gray}{0.85}
+\\newcommand*{\\leftbarcolorcmd}{\\color{leftbarcolor}}%
+\\colorlet{leftbarcolor}{light-gray}
+
+\\renewenvironment{leftbar}{%
+  \\def\\FrameCommand{{\\leftbarcolorcmd{\\vrule width \\leftbarwidth\\relax\\hspace {\\leftbarsep}}}}%
+  \\MakeFramed {\\advance \\hsize -\\width \\FrameRestore }%
+  }{%
+  \\endMakeFramed
+}
+
+\\begin{document}
 \\definecolor{code-background}{gray}{.95}
-"""
+"""[1:-1]
 
 POSTAMBLE = "\\end{document}"
 
-NEW_LINE = "\\mbox\\\\\n"
-INDENT = "\\indent\n"
-BLANK_LINE = NEW_LINE + NEW_LINE
+PACKAGES = {}
 
-UNCHECKED_BOX = "$\square$"
-CHECKED_BOX = '\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}'
+def packages(**packages):
+    for k, v in packages.items():
+        if k in PACKAGES:
+            PACKAGES[k].extend(v)
+        else:
+            PACKAGES[k] = v
+    
+    def wrapper(fn):
+        return fn
+    
+    return wrapper
+    
+
+# BLANK_LINE = "\\mbox{}"
+# NEW_LINE = "\\mbox\\\\\n"
+# INDENT = "\\indent\n"
 
 def underlined(text):
     return f"\\underline{{{text}}}"
@@ -96,19 +122,98 @@ def italics(text):
 def strikethrough(text):
     return f"\\sout{{{text}}}"
 
+def compose(*functions):
+    return reduce(lambda f, g: lambda x: f(g(x)), functions, lambda x: x)
+
 
 class LatexRenderer(BaseRenderer):
 
     def __init__(self):
         super().__init__()
-        self.packages = {}
-        self.render_map['BlockCode'] = self.render_banner
+        self.stack: List[Container] = [Block()]
+        
+        old_render = self.render
+        
+        def render(token):
+            result = old_render(token)
+            return result or ''
+        
+        self.render = render
+
+
+    def push(self, *elements):
+        for element in elements:
+            self.stack[-1].push(element)
+    
+    def pop(self):
+        return self.stack.pop()
+    
+    @contextmanager
+    def span(self, action=None):
+        self.start_span(action=action)
+        yield
+        self.end_span()
+    
+    def start_span(self, action=None) -> Span:
+        span = Span(action=action)
+        self.push(span)
+        self.stack.append(span)
+        
+        return span
+    
+    
+    def end_span(self):
+        self.stack.pop()
+    
+    
+    def start_block(self, string: str = None, action=None, deindent=None) -> Block:
+        block = Block(action=action, deindent=deindent)
+        
+        if string is not None:
+            block.prefix = string
+        
+        # need to un-nest
+        for idx in reversed(range(len(self.stack))):
+            element = self.stack[idx]
+            
+            if type(element) is Block:
+                element.push(block)
+                break
+
+        self.stack.append(block)
+        return block
+    
+    
+    def end_block(self, string: str = None):
+        block = self.pop()
+        
+        if string is not None:
+            block.suffix = string
+
+    ########################################################################
     
     def render_document(self, token):
-        rendered = PREAMBLE
-        rendered += self.render_inner(token)
-        rendered += POSTAMBLE
-        return rendered
+        
+        def newlines(text):
+            # replacement = uuid.uuid4().hex
+            # text = re.sub(r'^\\\\$', replacement, text, flags=re.MULTILINE)
+            text = re.sub(r'(\S+)\n{2,}(\s*[^\\]\S+)', r'\1\\mbox{}\\\\\n\n\2', text, flags=re.MULTILINE)
+            # text = re.sub(replacement, '', text, flags=re.MULTILINE)
+            return text
+
+        packages = '\n'.join([
+            f'\\usepackage{options or ""}{{{package}}}'
+            for package, options in PACKAGES.items()
+        ])
+        preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
+
+        self.start_block(action=newlines)
+        self.push(preamble, "\n")
+        self.render_inner(token)
+        self.push(POSTAMBLE)
+        self.end_block()
+
+        return self.stack[0].render(indent=-2)
 
 
     def render_to_plain(self, token):
@@ -118,66 +223,87 @@ class LatexRenderer(BaseRenderer):
         else:
             return token.content
     
-
+    
     def render_raw_text(self, token):
         rtn = self.render_to_plain(token)
-        rtn = re.sub(r'(\\)',r'\\textbackslash ', rtn)
-        rtn = re.sub(r'([\&\%\$\#\_\{\}~\^])',r'\\\1', rtn)
-        
-        return rtn
 
-        
+        rtn = re.sub(r'((?<!\\)[#$%&_{}\\])', r'\\\1', rtn)
+        rtn = re.sub(r'((?<!\\)~)', r'\\textasciitilde{}', rtn)
+        rtn = re.sub(r'((?<!\\)\^)', r'\\textasciicircum{}', rtn)
+        rtn = re.sub(r'(\\\\)', r'\\textbackslash{}', rtn)
+
+        self.push(rtn)
+    
     # inline styles
     
     def render_strong(self, token):
-        return bold(self.render_inner(token))
+        with self.span(bold):
+            self.render_inner(token)
 
 
     def render_emphasis(self, token):
-        return italics(self.render_inner(token))
+        with self.span(italics):
+            self.render_inner(token)
 
 
     def render_strikethrough(self, token):
-        return strikethrough(self.render_inner(token))
-
+        with self.span(strikethrough):
+            self.render_inner(token)
+    
 
     def render_inline_code(self, token):
-        return f"\colorbox{{code-background}}{{\\texttt{{{self.render_inner(token)}}}}}" + BLANK_LINE
+        def colorbox(text):
+            return f"\\colorbox{{code-background}}{{\\texttt{{{text}}}}}"
+        
+        with self.span(colorbox):
+            self.render_inner(token)
 
 
     def render_line_break(self, token):
-        return '\n' if token.soft else '\\newline\n'
-
-
+        print("NEWLINE")
+        if token.soft:
+            self.push('\\\\')
+        # else:
+        #     self.push("\\mbox{}\\\\\n")
+        
+        # self.push('' if token.soft 
+        # self.push(BLANK_LINE)
+    
+    @packages(hyperref=[])
     def render_link(self, token):
-        return f'\\href{{{token.target}}}{{{self.render_inner(token)}}}'
-
-
+        def href(text):
+            return f'\\href{{{token.target}}}{{{text}}}'
+        
+        with self.span(href):
+            self.render_inner(token)
+    
+    
     def render_auto_link(self, token):
-        return f'\\url{{{token.target}}}'
+        self.push(f'\\url{{{token.target}}}')
 
-
+    
+    @packages(graphicx=[])
     def render_image(self, token):
-        self.packages['graphicx'] = []
-        return '\n\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{}}}\n'.format(token.src)
+        self.push(f'\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{token.src}}}', '')
 
 
     def render_heading(self, token):
-        text = self.render_inner(token)
-        
         if token.level == 1:
-            return f"\n{{\\section*{{{text}}}}}\n"
+            heading = lambda text: f"{{\\section*{{{text}}}}}"
 
         elif token.level == 2:
-            return f"\n{{\\subsection*{{{underlined(text)}}}}}\n"
+            heading = lambda text: f"{{\\subsection*{{{underlined(text)}}}}}"
         
         elif token.level >= 3:
-            return f"\n{{\\subsubsection*{{{text}}}}}\n"
+            heading = lambda text: f"{{\\subsubsection*{{{text}}}}}"
        
         else:
-            return f"\n{underlined(self.render_inner(token))}\n"
-    
+            heading = lambda text: f"{underlined(text)}"
+
+        with self.span(heading):
+            self.render_inner(token)
         
+    
     @staticmethod
     def invert_case(text):
         new = []
@@ -192,60 +318,58 @@ class LatexRenderer(BaseRenderer):
         
         return ''.join(new)
     
-    
-    def render_banner(self, token):
-        text = self.render_inner(token)
-        lines = text.splitlines()
-        line = "=" * (max(len(lines[0]), len(lines[-1])) -1)
-        
-        return f"{line}\n\n{text}\n{line}\n"
 
     def render_thematic_break(self, token):
-        return '\n\\hrulefill\n'
+        self.push('\\mbox{}', '\\hrulefill', '\\mbox{}\n')
     
     
     def render_paragraph(self, token):
-        text = self.render_inner(token)
-        return f'{text}\\\\\n\n' #do we want this after?
+        self.render_inner(token)
+        self.push('')
 
-
+    
     def render_quote(self, token):
-        return f"\n\\begin{{leftbar}}\n\\begin{{quote}}\n{self.render_inner(token)}\n\\end{{quote}}\n\\end{{leftbar}}\n"
+        self.start_block('\\begin{leftbar}{\\color{gray}')
+        self.render_inner(token)
+        self.end_block('}\\end{leftbar}')
     
     
+    @packages(listings=[])
     def render_list(self, token):
-        self.packages['listings'] = []
-        template = '\\begin{{{tag}}}\n{inner}\\end{{{tag}}}\n'
         tag = 'enumerate' if token.start is not None else 'itemize'
-        inner = ' '.join([self.render(child) for child in token.children])
-        return template.format(tag=tag, inner=inner)
-
+        
+        self.push('')
+        self.start_block(f"\\begin{{{tag}}}")
+        self.render_inner(token)
+        self.end_block(f"\\end{{{tag}}}")
+        self.push('')
     
+        
     def render_list_item(self, token):
-        rendered = ""
-        line = self.render_inner(token)
+        
+        def coalesce(text):
+            if not text.strip():
+                return '---'
+            else:
+                return text
+       
+        def replace_checkboxes(text):
+            text = re.sub(r'^(\s*)\[x]', r'\1\\checkedbox{}', text)
+            text = re.sub(r'^(\s*)\[ ]', r'\1\\uncheckedbox{}', text)
+            return text
+       
+        with self.span():
+            self.push("\\item ")
+            
+            with self.span(compose(coalesce, replace_checkboxes)):
+                self.render_inner(token)
 
-        if line.strip() != '':
-            line = line.strip()
-        else:
-            line = '---'  #arbitrary non-empty token that is necessary for latex to not complain about having a list with no elements. Design feedback welcome
-        if line:
-            if line[:3] == '[x]':
-                line = CHECKED_BOX + line[3:-2]
-            elif line[:3] == '[ ]':
-                line = UNCHECKED_BOX + line[3:-2]
-            rendered += f"\\item {line} \n"
-
-        return rendered
-
+      
+    @packages(listings=[])
     def render_block_code(self, token):
-        innards = self.render_inner(token)
-        rendered = \
-            "\\begin{lstlisting}[backgroundcolor = \color{gray!10}]\n" \
-            f"{innards}\n" \
-            "\\end{lstlisting}\n" \
-
-        return rendered
+        self.start_block("\\begin{lstlisting}[backgroundcolor = \\color{gray!10}]", deindent=True)
+        self.render_inner(token)
+        self.end_block("\\end{lstlisting}\n")
 
 
     def render_table(self, token):
@@ -275,7 +399,7 @@ class LatexRenderer(BaseRenderer):
         else: head_rendered = ''
         inner = self.render_inner(token)
         align = render_align(token.column_align)
-        return template.format(inner=head_rendered+inner, align=align)
+        self.push(template.format(inner=head_rendered+inner, align=align))
 
 
     def render_table_row(self, token):
