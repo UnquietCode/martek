@@ -1,0 +1,28 @@
+name: Create Branch
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'name of the branch to create'
+        required: true
+        default: 'issues'
+jobs:
+  runs-on: ubuntu-latest
+  steps:
+    - id: get-hash
+      name: get the hash of the empty tree
+      run: echo "::set-output name=git-hash::$(git hash-object -t tree /dev/nul)"
+      shell: bash
+    
+    - id: create-branch
+      name: create a bare branch
+      uses: actions/github-script@v3
+      with:
+        github-token: ${{ secrets.GITHUB_KEY }}
+        script: |
+          github.git.createRef({
+            owner: '${{ context.repo.owner }}',
+            repo: '${{ context.repo.repo }}',
+            ref: 'refs/heads/${{github.event.inputs.name}}',
+            sha: '${{ steps.get-hash.outputs.git-hash }}}',
+          })
