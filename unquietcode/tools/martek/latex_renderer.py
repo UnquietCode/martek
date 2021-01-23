@@ -1,153 +1,219 @@
-import shutil
-import math
-import textwrap
-import random
 import re
+from contextlib import contextmanager
+from functools import reduce
+from typing import List
 
 from mistletoe.base_renderer import BaseRenderer
-from pyfiglet import Figlet
 
-# https://github.com/miyuchina/mistletoe/blob/master/mistletoe/base_renderer.py
+from .elements import Block, Span, Container
 
-    # 'Document':       self.render_document,
-    # 'Strong':         self.render_strong,
-    # 'Emphasis':       self.render_emphasis,
-    # 'Strikethrough':  self.render_strikethrough,
-    # 'LineBreak':      self.render_line_break,
-    # 'Quote':          self.render_quote,
-    # 'Paragraph':      self.render_paragraph,
-    # 'ThematicBreak':  self.render_thematic_break,
-    # 'InlineCode':     self.render_inline_code,
-    # 'CodeFence':      self.render_block_code,
-    # 'Link':           self.render_link,
-    # 'List':           self.render_list,
-    # 'ListItem':       self.render_list_item,
-    # 'Heading':        self.render_heading,
+# 'Document':       self.render_document,
+# 'Strong':         self.render_strong,
+# 'Emphasis':       self.render_emphasis,
+# 'Strikethrough':  self.render_strikethrough,
+# 'LineBreak':      self.render_line_break,
+# 'Quote':          self.render_quote,
+# 'Paragraph':      self.render_paragraph,
+# 'ThematicBreak':  self.render_thematic_break,
+# 'InlineCode':     self.render_inline_code,
+# 'CodeFence':      self.render_block_code,
+# 'Link':           self.render_link,
+# 'List':           self.render_list,
+# 'ListItem':       self.render_list_item,
+# 'Heading':        self.render_heading,
+
+# 'RawText':        self.render_raw_text,
+# 'AutoLink':       self.render_auto_link, ???
+# 'EscapeSequence': self.render_escape_sequence,    ???
+# 'SetextHeading':  self.render_heading,    ???
+
+# 'Image':          self.render_image, ????
+# 'BlockCode':      self.render_block_code,
+# 'Table':          self.render_table, ????
+# 'TableRow':       self.render_table_row, ????????
+# 'TableCell':      self.render_table_cell, ??????????
+
+
+PREAMBLE = """
+\\documentclass{article}
+
+%-PACKAGES-%
+
+\\usepackage{mdframed}
+\\usepackage{ulem}
+\\usepackage{xcolor}
+\\lstset{
+  basicstyle=\\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  postbreak=\\mbox{\\textcolor{red}{$\\hookrightarrow$}\\space},
+  backgroundcolor=\colorgray!10
+}
+\\usepackage{etoolbox}
+\\usepackage{fancyvrb}
+\\usepackage{xunicode}
+\\usepackage[english]{babel}
+\\usepackage[T1]{fontenc}
+\\usepackage{eurosym}
+\\usepackage{textcomp}
+\\usepackage{enumitem,amssymb}
+\\usepackage{cprotect}
+\\usepackage{framed}
+
+\\usepackage{xltxtra}
+\\setmainfont{FreeSerif}
+\\setmonofont{FreeMono}
+
+\\graphicspath{ {./images/} }
+\\newcommand{\\checkedbox}{\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}}
+\\newcommand{\\uncheckedbox}{$\\square$}
+\\setlength{\\parindent}{0pt}
+
+\\newlength{\\leftbarwidth}
+\\setlength{\\leftbarwidth}{2pt}
+\\newlength{\\leftbarsep}
+\\setlength{\\leftbarsep}{8pt}
+\\definecolor{light-gray}{gray}{0.85}
+\\newcommand*{\\leftbarcolorcmd}{\\color{leftbarcolor}}%
+\\colorlet{leftbarcolor}{light-gray}
+
+\\renewenvironment{leftbar}{%
+  \\def\\FrameCommand{{\\leftbarcolorcmd{\\vrule width \\leftbarwidth\\relax\\hspace {\\leftbarsep}}}}%
+  \\MakeFramed {\\advance \\hsize -\\width \\FrameRestore }%
+  }{%
+  \\endMakeFramed
+}
+
+\\begin{document}
+\\definecolor{code-background}{gray}{.95}
+"""[1:-1]
+
+POSTAMBLE = "\\end{document}"
+
+PACKAGES = {}
+
+def packages(**packages):
+    for k, v in packages.items():
+        if k in PACKAGES:
+            PACKAGES[k].extend(v)
+        else:
+            PACKAGES[k] = v
     
-    # 'RawText':        self.render_raw_text,
-    # 'AutoLink':       self.render_auto_link,
-    # 'EscapeSequence': self.render_escape_sequence,    
-    # 'SetextHeading':  self.render_heading,
+    def wrapper(fn):
+        return fn
     
-    # 'Image':          self.render_image,
-    # 'BlockCode':      self.render_block_code,
-    # 'Table':          self.render_table,
-    # 'TableRow':       self.render_table_row,
-    # 'TableCell':      self.render_table_cell,
-
-
-class CharacterSequence:
-    ESC = '\u001B['
-    OSC = '\u001B]'
-    BEL = '\u0007'
-    SEP = ';'
-
-# alias for brevity
-C = CharacterSequence
-
-TRAILING_WHITESPACE = re.compile("^.*?(\s+)$")
-
-
-def prefixed(prefix):
-    
-    def outer(fn):
-        
-        # wraps.
-        def decorated(*args, **kwargs):
-            result = fn(*args, **kwargs)
-            return prefix + result
-            
-        return decorated
-    
-    return outer
-
-
-def sufixed(suffix):
-    
-    def outer(fn):
-        
-        # wraps.
-        def decorated(*args, **kwargs):
-            result = fn(*args, **kwargs)
-            return result + suffix
-            
-        return decorated
-    
-    return outer
-
+    return wrapper
     
 
-# TODO wrapping by width of terminal
+# BLANK_LINE = "\\mbox{}"
+# NEW_LINE = "\\mbox\\\\\n"
+# INDENT = "\\indent\n"
 
 def underlined(text):
-    return f"\x1B[4m{text}\x1B[0m"
+    return f"\\underline{{{text}}}"
     
 def bold(text):
-    return f"\x1B[1m{text}\x1B[0m"
+    return f"\\textbf{{{text}}}"
     
 def italics(text):
-     return f"\x1B[3m{text}\x1B[0m"
-
-def dim(text):
-    return f"\x1b[2m{text}\x1B[0m"
+    return f"\\textit{{{text}}}"
 
 def strikethrough(text):
-    return f"\x1B[9m{text}\x1B[0m"
+    return f"\\sout{{{text}}}"
 
-def grey(text):
-    return f"  \x1B[37m{text}\x1B[0m"
+def compose(*functions):
+    return reduce(lambda f, g: lambda x: f(g(x)), functions, lambda x: x)
 
 
-class TerminalRenderer(BaseRenderer):
+class LatexRenderer(BaseRenderer):
 
     def __init__(self):
         super().__init__()
+        self.stack: List[Container] = [Block()]
         
-        self.render_map['BlockCode'] = self.render_banner
-    
-    
-    def _get_terminal_size(self): # columns, rows tuple
-        return shutil.get_terminal_size()
-    
-    @property
-    def _terminal_rows(self):
-        return self._get_terminal_size()[1]
-
-    @property
-    def _terminal_cols(self):
-        return self._get_terminal_size()[0]
-    
-    @property
-    def _spacer(self):
-        return "  "
+        old_render = self.render
         
-    @property
-    def _margin(self):
-        return math.floor(self._terminal_cols * 0.75)        
+        def render(token):
+            result = old_render(token)
+            return result or ''
+        
+        self.render = render
 
 
-    def figlet(self, font, text, space=1, transform=None):
-        if transform is not None:
-            text = transform(text) 
+    def push(self, *elements):
+        for element in elements:
+            self.stack[-1].push(element)
+    
+    def pop(self):
+        return self.stack.pop()
+    
+    @contextmanager
+    def span(self, action=None):
+        self.start_span(action=action)
+        yield
+        self.end_span()
+    
+    def start_span(self, action=None) -> Span:
+        span = Span(action=action)
+        self.push(span)
+        self.stack.append(span)
         
-        figlet = Figlet(font=font, width=self._margin)
-        lines = figlet.renderText(text).splitlines()
+        return span
+    
+    
+    def end_span(self):
+        self.stack.pop()
+    
+    
+    def start_block(self, string: str = None, action=None, deindent=None) -> Block:
+        block = Block(action=action, deindent=deindent)
         
-        rendered = ""
-        space = ' ' * space
+        if string is not None:
+            block.prefix = string
         
-        for line in lines:
-            rendered += f"{space}{line}\n"
+        # need to un-nest
+        for idx in reversed(range(len(self.stack))):
+            element = self.stack[idx]
+            
+            if type(element) is Block:
+                element.push(block)
+                break
 
-        return rendered[0:-1]
+        self.stack.append(block)
+        return block
     
     
-    # generic styles
+    def end_block(self, string: str = None):
+        block = self.pop()
+        
+        if string is not None:
+            block.suffix = string
+
+    ########################################################################
     
     def render_document(self, token):
-        rendered = "\n"
-        rendered += self.render_inner(token)
-        return rendered
+        
+        def newlines(text):
+            # replacement = uuid.uuid4().hex
+            # text = re.sub(r'^\\\\$', replacement, text, flags=re.MULTILINE)
+            text = re.sub(r'(\S+)\n{2,}(\s*[^\\]\S+)', r'\1\\mbox{}\\\\\n\n\2', text, flags=re.MULTILINE)
+            # text = re.sub(replacement, '', text, flags=re.MULTILINE)
+            return text
+
+        packages = '\n'.join([
+            f'\\usepackage{options or ""}{{{package}}}'
+            for package, options in PACKAGES.items()
+        ])
+        preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
+
+        self.start_block(action=newlines)
+        self.push(preamble, "\n")
+        self.render_inner(token)
+        self.push(POSTAMBLE)
+        self.end_block()
+
+        return self.stack[0].render(indent=-2)
 
 
     def render_to_plain(self, token):
@@ -157,107 +223,86 @@ class TerminalRenderer(BaseRenderer):
         else:
             return token.content
     
+    
+    def render_raw_text(self, token):
+        rtn = self.render_to_plain(token)
 
-    # def render_raw_text(self, token):
-    #     print(f"it's {token.content}")
-    #     return self.render_to_plain(token)
-        
-        
+        rtn = re.sub(r'((?<!\\)[#$%&_{}\\])', r'\\\1', rtn)
+        rtn = re.sub(r'((?<!\\)~)', r'\\textasciitilde{}', rtn)
+        rtn = re.sub(r'((?<!\\)\^)', r'\\textasciicircum{}', rtn)
+        rtn = re.sub(r'(\\\\)', r'\\textbackslash{}', rtn)
+
+        self.push(rtn)
+    
     # inline styles
     
     def render_strong(self, token):
-        return bold(self.render_inner(token))
+        with self.span(bold):
+            self.render_inner(token)
 
 
     def render_emphasis(self, token):
-        return italics(self.render_inner(token))
+        with self.span(italics):
+            self.render_inner(token)
 
 
     def render_strikethrough(self, token):
-        return strikethrough(self.render_inner(token))
-
-        # this doesn't seem to work as well
-
-        # rendered = ''
-        # 
-        # for c in self.render_inner(token):
-        #     rendered += f"{c}\u0336"
-        # 
-        # return rendered
+        with self.span(strikethrough):
+            self.render_inner(token)
     
-    
+
     def render_inline_code(self, token):
-        return f"\x1B[7m{self.render_inner(token)}\x1B[0m"
+        def colorbox(text):
+            return f"\\colorbox{{code-background}}{{\\texttt{{{text}}}}}"
+        
+        with self.span(colorbox):
+            self.render_inner(token)
 
 
     def render_line_break(self, token):
-        return '\n'# * len(token.content)
-
-
+        print("NEWLINE")
+        if token.soft:
+            self.push('\\\\')
+        # else:
+        #     self.push("\\mbox{}\\\\\n")
+        
+        # self.push('' if token.soft 
+        # self.push(BLANK_LINE)
+    
+    @packages(hyperref=[])
     def render_link(self, token):
-        return ''.join([
-            C.OSC,'8',C.SEP,C.SEP,
-            token.target,
-            C.BEL,
-            self.render_inner(token),
-            C.OSC,'8',C.SEP,C.SEP,C.BEL,
-        ])
+        def href(text):
+            return f'\\href{{{token.target}}}{{{text}}}'
         
-        # return f"{self.render_inner(token)} ({underlined(token.target)})"
+        with self.span(href):
+            self.render_inner(token)
+    
+    
+    def render_auto_link(self, token):
+        self.push(f'\\url{{{token.target}}}')
 
-    # @prefixed('\n')
-    @sufixed('\n')
+    
+    @packages(graphicx=[])
+    def render_image(self, token):
+        self.push(f'\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{{{token.src}}}', '')
+
+
     def render_heading(self, token):
-        space = 2
-        text = self.render_to_plain(token)
-        
         if token.level == 1:
-            return self.figlet('standard', text.replace(' ', '  '), space=space)
+            heading = lambda text: f"{{\\section*{{{text}}}}}"
 
         elif token.level == 2:
-            rendered = self.figlet('ogre', text, space=space)
-            
-            # make the last line underlined
-            lines = rendered.split('\n')
-            last_line = lines[-1]
-            longest_line = max([len(line) for line in lines])
-            
-            line_to_underline = last_line[len(self._spacer):]
-            line_to_underline += ' ' * (longest_line - len(line_to_underline))
-            
-            last_line = self._spacer + underlined(line_to_underline)
-            lines[-1] = last_line
-            rendered = '\n'.join(lines)
-            
-            return f"{rendered}\n"
+            heading = lambda text: f"{{\\subsection*{{{underlined(text)}}}}}"
         
-        elif token.level == 3:
-            return self.figlet('cybermedium', text, space=space)
-            
-        elif token.level == 4:
-            return f"{self._spacer}{underlined(bold(self.render_inner(token).upper()))}"
-
-        elif token.level == 5:
-            return f"{self._spacer}{dim(underlined(bold(self.render_inner(token).upper())))}"
-                    
-        elif token.level >= 6:
-            return f"{self._spacer}{dim(underlined(self.render_inner(token).upper()))}"
-        
+        elif token.level >= 3:
+            heading = lambda text: f"{{\\subsubsection*{{{text}}}}}"
+       
         else:
-            return f"{self._spacer}{underlined(self.render_inner(token))}"
+            heading = lambda text: f"{underlined(text)}"
+
+        with self.span(heading):
+            self.render_inner(token)
         
-    
-    # def render_banner(self, token):
-    #     text = self.render_inner(token)
-    #     rendered = ""
-    # 
-    #     line = "=" * math.ceil((len(text) * 1.35))
-    #     padding = math.ceil((len(line) - len(text)) / 2)
-    #     inner_line = f"{padding * ' '}{text}{padding * ' '}"
-    #     return f"{line}\n\n{inner_line}\n{line}\n"
-    # # 
-    #     # rendered += '\n\n' + text + '\n' + rendered
-        # return rendered
     
     @staticmethod
     def invert_case(text):
@@ -273,118 +318,93 @@ class TerminalRenderer(BaseRenderer):
         
         return ''.join(new)
     
-    def render_banner(self, token):
-        text = self.render_inner(token)
-        text = self.figlet('com_sen_', self.invert_case(text), space=2)
-        
-        lines = text.splitlines()
-        line = "=" * (max(len(lines[0]), len(lines[-1])) -1)
-        
-        return f"{line}\n\n{text}\n{line}\n"
-    
-    
-    # def render_escape_sequence(self, token):
-    #     if self.render_inner(token) == "\\":
-    #         return "QQ"
-    #     else:
-    #         return super().render_escape_sequence(self, token)
-        
-    
+
     def render_thematic_break(self, token):
-        width = math.floor(self._terminal_cols * 0.45)
-        
-        rendered = f"{self._spacer}◈"
-        rendered += "─" * width
-        rendered += "◈\n\n"
-        return rendered
-        
+        self.push('\\mbox{}', '\\hrulefill', '\\mbox{}\n')
+    
     
     def render_paragraph(self, token):
-        text = self.render_inner(token)
-        rendered = ""
+        self.render_inner(token)
+        self.push('')
 
-        lines = textwrap.wrap(text, width=self._margin, replace_whitespace=False, drop_whitespace=False)
-        
-        for line in lines:
-            for line in line.split("\n"):
-                add_newline = False
-
-                if line.endswith('\\'):
-                    line = line[:-1]
-                    add_newline = True
-                # elif not line.strip():
-                #     add_newline = True
-
-                rendered += f"{self._spacer}{line.strip()}\n"
-                # rendered += '\n' if add_newline is True else ''
-                # rendered += "\n"
-                if not line.strip() and add_newline is True:
-                    rendered += "\n"
-        
-        # if rendered.strip():
-            # rendered += "\n"
-        
-        return rendered
-        
-
+    
     def render_quote(self, token):
-        innards = self.render_inner(token)
-        rendered = ''
-
-        for line in innards.splitlines():
-            if line.strip():
-                inner = grey(f"|  {line.strip()}")
-                rendered += f"{self._spacer}{inner}\n"
-            else:
-                rendered += line
-
-        rendered += "\n"
-        return rendered
+        self.start_block('\\begin{leftbar}{\\color{gray}')
+        self.render_inner(token)
+        self.end_block('}\\end{leftbar}')
     
     
+    @packages(listings=[])
     def render_list(self, token):
-        rendered = ""
-        counter = None
+        tag = 'enumerate' if token.start is not None else 'itemize'
         
-        if token.start is not None:
-            counter = token.start
-        
-        for child in token.children:
-            if counter is not None:
-                rendered += f"{self._spacer}{counter}. "
-                counter += 1
-            else:
-                prefix = ' ' * ((child.prepend - 2) * 2)
-                rendered += f"{self._spacer}{prefix}{child.leader} "
-            
-            rendered += self.render(child)
-        
-        rendered += "\n"
-        return rendered
+        self.push('')
+        self.start_block(f"\\begin{{{tag}}}")
+        self.render_inner(token)
+        self.end_block(f"\\end{{{tag}}}")
+        self.push('')
     
-    
+        
     def render_list_item(self, token):
-        rendered = ""
-        line = self.render_inner(token)
         
-        if line.strip():
-            rendered += f"{line.strip()}\n"
-        
-        return rendered
-        
-    
-    def render_block_code(self, token):
-        innards = self.render_inner(token)
-        rendered = ''
-
-        for line in innards.split('\n'):
-            if line.strip():
-                wrapped_lines = textwrap.wrap(line.strip(), width=self._margin)
-                
-                for wrapped_line in wrapped_lines:
-                    rendered += f"  \x1B[37m|  {wrapped_line}\x1B[0m\n"
+        def coalesce(text):
+            if not text.strip():
+                return '---'
             else:
-                rendered += f"  \x1B[37m|  {line}\x1B[0m\n"
+                return text
+       
+        def replace_checkboxes(text):
+            text = re.sub(r'^(\s*)\[x]', r'\1\\checkedbox{}', text)
+            text = re.sub(r'^(\s*)\[ ]', r'\1\\uncheckedbox{}', text)
+            return text
+       
+        with self.span():
+            self.push("\\item ")
+            
+            with self.span(compose(coalesce, replace_checkboxes)):
+                self.render_inner(token)
 
-        rendered += "\n"
-        return rendered
+      
+    @packages(listings=[])
+    def render_block_code(self, token):
+        self.start_block("\\begin{lstlisting}[backgroundcolor = \\color{gray!10}]", deindent=True)
+        self.render_inner(token)
+        self.end_block("\\end{lstlisting}\n")
+
+
+    def render_table(self, token):
+        def render_align(column_align):
+            if column_align != [None]:
+                cols = [get_align(col) for col in token.column_align]
+                return '{{{}}}'.format(' '.join(cols))
+            else:
+                return ''
+
+        def get_align(col):
+            if col is None:
+                return 'l'
+            elif col == 0:
+                return 'c'
+            elif col == 1:
+                return 'r'
+            raise RuntimeError('Unrecognized align option: ' + col)
+
+        template = ('\\begin{{tabular}}{align}\n'
+                    '{inner}'
+                    '\\end{{tabular}}\n')
+        if hasattr(token, 'header'):
+            head_template = '{inner}\\hline\n'
+            head_inner = self.render_table_row(token.header)
+            head_rendered = head_template.format(inner=head_inner)
+        else: head_rendered = ''
+        inner = self.render_inner(token)
+        align = render_align(token.column_align)
+        self.push(template.format(inner=head_rendered+inner, align=align))
+
+
+    def render_table_row(self, token):
+        cells = [self.render(child) for child in token.children]
+        return ' & '.join(cells) + ' \\\\\n'
+
+    def render_table_cell(self, token):
+        return self.render_inner(token)

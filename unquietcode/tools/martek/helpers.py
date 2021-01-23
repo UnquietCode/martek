@@ -1,8 +1,8 @@
 import mistletoe
 
-from . import TerminalRenderer
+from . import LatexRenderer
 
 
 def render_markdown(text):
-    rendered = mistletoe.markdown(text, TerminalRenderer)
+    rendered = mistletoe.markdown(text, LatexRenderer)
     return rendered

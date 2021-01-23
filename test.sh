@@ -1,3 +1,0 @@
-#!/bin/bash
-
-ls -alrh .
