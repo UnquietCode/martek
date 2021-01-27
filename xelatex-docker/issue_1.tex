@@ -1,0 +1,52 @@
+
+\documentclass{article}
+\usepackage{mdframed}
+\usepackage{hyperref}
+\usepackage{ulem}
+\usepackage{xcolor}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  backgroundcolor=\colorgray!10
+}
+\usepackage{etoolbox}
+\usepackage{fancyvrb}
+\usepackage{xunicode}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+
+\usepackage{eurosym}
+\usepackage{textcomp}
+\usepackage{enumitem,amssymb}
+\usepackage{cprotect}
+\usepackage{framed}
+\usepackage{graphicx}
+
+\usepackage{xltxtra}
+\setmainfont{FreeSerif}
+\setmonofont{FreeMono}
+
+\graphicspath{ {./images/} }
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\newcommand{\done}{\rlap{$\square$}{\raisebox{2pt}{\large\hspace{1pt}\cmark}}%
+\hspace{-2.5pt}}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+\definecolor{code-background}{gray}{.95}
+
+{\section*{\#1 – test}}
+
+{\subsubsection*{Reported by @iceplant}}
+\textbf{Milestone}: Version 1\\
+
+\begin{lstlisting}[backgroundcolor = \color{gray!10}]
+code
+
+\end{lstlisting}
+\end{document}

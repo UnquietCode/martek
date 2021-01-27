@@ -1,0 +1,63 @@
+
+\documentclass{article}
+\usepackage{mdframed}
+\usepackage{hyperref}
+\usepackage{ulem}
+\usepackage{xcolor}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  backgroundcolor=\colorgray!10
+}
+\usepackage{etoolbox}
+\usepackage{fancyvrb}
+\usepackage{xunicode}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+
+\usepackage{eurosym}
+\usepackage{textcomp}
+\usepackage{enumitem,amssymb}
+\usepackage{cprotect}
+\usepackage{framed}
+\usepackage{graphicx}
+
+\usepackage{xltxtra}
+\setmainfont{FreeSerif}
+\setmonofont{FreeMono}
+
+\graphicspath{ {./images/} }
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\newcommand{\done}{\rlap{$\square$}{\raisebox{2pt}{\large\hspace{1pt}\cmark}}%
+\hspace{-2.5pt}}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+\definecolor{code-background}{gray}{.95}
+
+{\section*{\#3 – support custom token "BracketedSpan"}}
+
+{\subsubsection*{Reported by @UnquietCode}}
+\textbf{Milestone}: Version 2\\
+
+Support a new span token "BracketedSpan". Which looks like: \colorbox{code-background}{\texttt{[text]\{metadata\}}}\mbox\\
+\mbox\\
+\\
+
+\begin{itemize}
+\item \mbox{\ooalign{$\checkmark$\cr\hidewidth$\square$\hidewidth\cr}} implement a new token class 
+ \item $\square$ pass token to our renderer on init 
+ \item $\square$ define a new render method \colorbox{code-background}{\texttt{render\_bracketedspan}}\mbox\\
+\mbox\\
+ (or maybe \colorbox{code-background}{\texttt{render\_bracketed\_span}}\mbox\\
+\mbox\\
+) which will be invoked by mistletoe 
+ \item $\square$ for now render it in latex by just rendering the text part, ignoring the metadata 
+ \item $\square$ test that it renders 
+\end{itemize}
+\end{document}
