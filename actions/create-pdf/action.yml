@@ -14,39 +14,16 @@ inputs:
   contentURL:
     description: a public URL where markdown content can be downloaded
     required: false
-
+outputs:
+  pdf:
+    description: rendered PDF file, base64 encoded 
 runs:
-  using: composite
-  steps: 
- 
-    - id: create-tree
-      name: create a bare tree
-      uses: actions/github-script@v3
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          github.git.createTree({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            tree: [{
-               path: 'dummy',
-               mode': '100644',
-               type': 'blob',
-               content': "",              
-            }]
-          })
-    - id: create-branch
-      name: create a bare branch
-      uses: actions/github-script@v3
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          github.git.createRef({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            ref: 'refs/heads/${{ github.event.inputs.name }}',
-            sha: '${{ steps.create-tree.outputs.result.sha }}',
-          })
+  using: docker
+  image: './Dockerfile'
+  args:
+    - "${{ inputs.content }}"
+    - "${{ inputs.content64 }}"
+    - "${{ inputs.contentURL }}"
 branding:
   icon: git-commit
   color: gray-dark
