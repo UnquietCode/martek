@@ -19,7 +19,7 @@ outputs:
     description: rendered PDF file, base64 encoded 
 runs:
   using: docker
-  image: '../../Dockerfile'
+  image: './Dockerfile'
   args:
     - "${{ inputs.content }}"
     - "${{ inputs.content64 }}"
