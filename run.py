@@ -38,7 +38,7 @@ def main():
     else:
         if len(sys.argv) > 3 or len(sys.argv) < 2:
             print("usage: martek <input.md> (output.pdf)")
-            exit(1)
+            exit(2)
         elif len(sys.argv) == 3:
             file_path_1 = sys.argv[1]
             file_path_2 = sys.argv[2]
@@ -49,7 +49,10 @@ def main():
             elif file_path_2.lower().endswith(".md"):
                 md_file = file_path_2
                 pdf_file_path = file_path_1
-                
+            else:
+                print("usage: martek <input.md> (output.pdf)")
+                exit(3)
+            
             if not pdf_file_path.lower().endswith(".pdf"):
                 pdf_file_path += ".pdf"
         else:
