@@ -61,10 +61,9 @@ jobs:
 
   create-issue-pdf:
     needs: [get-all-issues]
-
+    continue-on-error: true
     strategy:
       max-parallel: 1
-      continue-on-error: true
       matrix:
         issue: ${{ fromJSON(needs.get-all-issues.outputs.issue_keys) }}
 
