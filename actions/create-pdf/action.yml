@@ -19,7 +19,7 @@ outputs:
     description: rendered PDF file, base64 encoded 
 runs:
   using: docker
-  image: './Dockerfile'
+  image: unquietcode/martek_create-pdf-action
   args:
     - "${{ inputs.content }}"
     - "${{ inputs.content64 }}"
