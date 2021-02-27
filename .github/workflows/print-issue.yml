@@ -17,11 +17,12 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: | 
-            return await github.issues.get({
+            const result = await github.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.inputs.issue,
             });
+            return result.data;
       
       - id: convert-to-base64
         name: convert the issue JSON to base64
