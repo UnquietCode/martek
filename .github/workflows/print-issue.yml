@@ -26,7 +26,7 @@ jobs:
       - id: convert-to-base64
         name: convert the issue JSON to base64
         env:
-          ISSUE_DATA: ${{ toJSON(fromJSON(steps.get-issue.outputs.results) }}
+          ISSUE_DATA: ${{ toJSON(fromJSON(steps.get-issue.outputs.results)) }}
         run: |
           echo "::set-output name=issue_data::$(echo $ISSUE_DATA | base64 -w0)"
 
