@@ -14,6 +14,9 @@ inputs:
   contentURL:
     description: a public URL where markdown content can be downloaded
     required: false
+  zip64:
+    description: Base64 encoded zip archive with a markdown file inside.
+    required: false
 outputs:
   pdf:
     description: rendered PDF file, base64 encoded 
@@ -24,6 +27,7 @@ runs:
     - "${{ inputs.content }}"
     - "${{ inputs.content64 }}"
     - "${{ inputs.contentURL }}"
+    - "${{ inputs.zip64 }}"
 branding:
   icon: git-commit
   color: gray-dark
