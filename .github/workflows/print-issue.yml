@@ -1,4 +1,4 @@
-name: Issue Printer - Backfill Issue
+name: Issue Printer - Print Issue
 on:
   workflow_dispatch:
     inputs:
