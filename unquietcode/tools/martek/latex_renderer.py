@@ -213,7 +213,7 @@ class LatexRenderer(BaseRenderer):
         preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
         
         if self.image_dir:
-            preamble += r"\n{\graphicspath{{"+self.image_dir+r"}}\n"
+            preamble += r"\n\graphicspath{{"+self.image_dir+r"}}\n"
 
         self.start_block(action=newlines)
         self.push(preamble, "\n")
