@@ -66,7 +66,8 @@ PREAMBLE = """
 \\setmainfont{FreeSerif}
 \\setmonofont{FreeMono}
 
-\\graphicspath{ {./images/} }
+%-RESOURCES-%
+
 \\newcommand{\\checkedbox}{\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}}
 \\newcommand{\\uncheckedbox}{$\\square$}
 \\setlength{\\parindent}{0pt}
@@ -215,7 +216,11 @@ class LatexRenderer(BaseRenderer):
         preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
         
         if self.image_dir:
-            preamble += r"\n\\graphicspath{{"+self.image_dir+r"}}\n"
+            preamble = preamble.replace('%-RESOURCES-%', "\n".join([
+                "\\graphicspath{ {"+self.image_dir+r"} }"
+            ]))
+        else:
+            preamble = preamble.replace('%-RESOURCES-%', "")
 
         self.start_block(action=newlines)
         self.push(preamble, "\n")
