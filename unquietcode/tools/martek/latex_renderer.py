@@ -1,3 +1,4 @@
+import os
 import re
 from contextlib import contextmanager
 from functools import reduce
@@ -65,7 +66,8 @@ PREAMBLE = """
 \\setmainfont{FreeSerif}
 \\setmonofont{FreeMono}
 
-\\graphicspath{ {./images/} }
+%-RESOURCES-%
+
 \\newcommand{\\checkedbox}{\\mbox{\\ooalign{$\\checkmark$\\cr\\hidewidth$\\square$\\hidewidth\\cr}}}
 \\newcommand{\\uncheckedbox}{$\\square$}
 \\setlength{\\parindent}{0pt}
@@ -128,10 +130,16 @@ def compose(*functions):
 
 class LatexRenderer(BaseRenderer):
 
-    def __init__(self):
+    def __init__(self, image_dir: str = None):
         super().__init__()
         self.stack: List[Container] = [Block()]
         
+        if image_dir is not None and (image_dir := image_dir.strip()):
+            self.image_dir = os.path.abspath(image_dir)
+        else:
+            self.image_dir = os.path.abspath(os.getcwd())
+        
+        # replace render method with custom wrapper
         old_render = self.render
         
         def render(token):
@@ -206,6 +214,13 @@ class LatexRenderer(BaseRenderer):
             for package, options in PACKAGES.items()
         ])
         preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
+        
+        if self.image_dir:
+            preamble = preamble.replace('%-RESOURCES-%', "\n".join([
+                "\\graphicspath{ {"+self.image_dir+"/} }"
+            ]))
+        else:
+            preamble = preamble.replace('%-RESOURCES-%', "")
 
         self.start_block(action=newlines)
         self.push(preamble, "\n")
