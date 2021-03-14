@@ -217,7 +217,7 @@ class LatexRenderer(BaseRenderer):
         
         if self.image_dir:
             preamble = preamble.replace('%-RESOURCES-%', "\n".join([
-                "\\graphicspath{ {"+self.image_dir+r"} }"
+                "\\graphicspath{ {"+self.image_dir+"/} }"
             ]))
         else:
             preamble = preamble.replace('%-RESOURCES-%', "")
