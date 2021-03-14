@@ -135,6 +135,8 @@ class LatexRenderer(BaseRenderer):
         
         if image_dir is not None and (image_dir := image_dir.strip()):
             self.image_dir = os.path.abspath(image_dir)
+        else:
+            self.image_dir = os.path.abspath(os.getcwd())
         
         # replace render method with custom wrapper
         old_render = self.render
@@ -213,7 +215,7 @@ class LatexRenderer(BaseRenderer):
         preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
         
         if self.image_dir:
-            preamble += r"\n\graphicspath{{"+self.image_dir+r"}}\n"
+            preamble += r"\n\\graphicspath{{"+self.image_dir+r"}}\n"
 
         self.start_block(action=newlines)
         self.push(preamble, "\n")
