@@ -70,7 +70,7 @@ def main():
             markdown_data = markdown_file.read()
         
     # render the markdown file to LaTeX
-    rendered = mistletoe.markdown(markdown_data, LatexRenderer)
+    rendered = mistletoe.markdown(markdown_data, lambda: LatexRenderer(image_dir=os.getcwd()))
         
     with TemporaryDirectory() as tmp:
 

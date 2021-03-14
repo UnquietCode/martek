@@ -1,3 +1,4 @@
+import os
 import re
 from contextlib import contextmanager
 from functools import reduce
@@ -128,10 +129,14 @@ def compose(*functions):
 
 class LatexRenderer(BaseRenderer):
 
-    def __init__(self):
+    def __init__(self, image_dir: str = None):
         super().__init__()
         self.stack: List[Container] = [Block()]
         
+        if image_dir is not None and (image_dir := image_dir.strip()):
+            image_dir = os.path.abspath(image_dir)
+        
+        # replace render method with custom wrapper
         old_render = self.render
         
         def render(token):
@@ -206,6 +211,9 @@ class LatexRenderer(BaseRenderer):
             for package, options in PACKAGES.items()
         ])
         preamble = PREAMBLE.replace('%-PACKAGES-%', packages)
+        
+        if self.image_dir:
+            preamble += r"\n{\graphicspath{{"+self.image_dir+r"}}\n"
 
         self.start_block(action=newlines)
         self.push(preamble, "\n")
