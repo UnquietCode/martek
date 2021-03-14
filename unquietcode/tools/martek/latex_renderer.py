@@ -134,7 +134,7 @@ class LatexRenderer(BaseRenderer):
         self.stack: List[Container] = [Block()]
         
         if image_dir is not None and (image_dir := image_dir.strip()):
-            image_dir = os.path.abspath(image_dir)
+            self.image_dir = os.path.abspath(image_dir)
         
         # replace render method with custom wrapper
         old_render = self.render
